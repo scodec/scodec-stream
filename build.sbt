@@ -13,12 +13,9 @@ scalacOptions ++= Seq(
   "-feature",
   "-deprecation",
   "-unchecked",
-  "-optimise",
   "-Xcheckinit",
   "-Xlint",
   "-Xverify",
-  "-Yclosure-elim",
-  "-Yinline",
   "-Ywarn-all")
 
 scalacOptions in (Compile, doc) += "-groups"
