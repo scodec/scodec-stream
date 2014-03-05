@@ -13,6 +13,29 @@ import scodec.bits.BitVector
 object decode {
 
   /**
+   * Convert decoding errors in the given stream to normal termination.
+   * Other errors are raised as normal within the stream.
+   */
+  def attempt[A](p: Process[Task,A]): Process[Task,A] =
+    p.attempt().flatMap {
+      _.fold(
+        { case e@DecodingError(_) => P.halt
+          case e: Throwable => P.fail(e)
+        },
+        P.emit
+      )
+    }
+
+  /**
+   * Raises a decoding error if the given stream is empty, otherwise
+   * returns `p` unaltered.
+   */
+  def nonEmpty[A](messageIfEmpty: String)(p: Process[Task,A]): Process[Task,A] =
+    p pipe {
+      P.await1[A].flatMap(process1.init(_)).orElse(fail(messageIfEmpty))
+    }
+
+  /**
    * Parse a stream of `A` values from the input, using the given decoder.
    * The returned stream terminates normally if the final value decoded
    * exhausts `in` and leaves no trailing bits. The returned stream terminates
@@ -30,10 +53,7 @@ object decode {
    * element if it succeeds.
    */
   def many1[A:Decoder](in: BitVector): Process[Task,A] =
-    many[A](in) pipe {
-      val msg = "many1 given empty input"
-      P.await1[A].flatMap(process1.init(_)).orElse(fail(msg))
-    }
+    nonEmpty("many1 given empty input")(many[A](in))
 
   /**
    * Like [[scodec.stream.decode.many]], but treats decoding errors as
@@ -41,14 +61,7 @@ object decode {
    * within the stream.
    */
   def tryMany[A:Decoder](in: BitVector): Process[Task,A] =
-    many[A](in).attempt().flatMap {
-      _.fold(
-        { case e@DecodingError(_) => P.halt
-          case e: Throwable => P.fail(e)
-        },
-        P.emit
-      )
-    }
+    attempt { many[A](in) }
 
   /**
    * Like [[scodec.stream.decode.tryMany]], but fails with an error if no
@@ -56,10 +69,7 @@ object decode {
    * element if it succeeds.
    */
   def tryMany1[A:Decoder](in: BitVector): Process[Task,A] =
-    tryMany[A](in) pipe {
-      val msg = "tryMany1 given empty input"
-      P.await1[A].flatMap(process1.init(_)).orElse(fail(msg))
-    }
+    attempt { many1[A](in) }
 
   /**
    * Like `many`, but parses and ignores a `D` delimiter value in between
@@ -83,10 +93,7 @@ object decode {
    * element if it succeeds.
    */
   def sepBy1[A:Decoder,D:Decoder](in: BitVector): Process[Task,A] =
-    sepBy[A,D](in) pipe {
-      val msg = "sepBy1 given empty input"
-      P.await1[A].flatMap(process1.init(_)).orElse(fail(msg))
-    }
+    nonEmpty ("sepBy1 given empty input") { sepBy[A,D](in) }
 
   /**
    * Like [[scodec.stream.decode.sepBy]], but treats decoding errors as
@@ -94,14 +101,7 @@ object decode {
    * within the stream.
    */
   def trySepBy[A:Decoder,D:Decoder](in: BitVector): Process[Task,A] =
-    sepBy[A,D](in).attempt().flatMap {
-      _.fold(
-        { case e@DecodingError(_) => P.halt
-          case e: Throwable => P.fail(e)
-        },
-        P.emit
-      )
-    }
+    attempt { sepBy[A,D](in) }
 
   /**
    * Like [[scodec.stream.decode.trySepBy]], but fails with an error if no
@@ -109,10 +109,7 @@ object decode {
    * element if it succeeds.
    */
   def trySepBy1[A:Decoder,D:Decoder](in: BitVector): Process[Task,A] =
-    trySepBy[A,D](in) pipe {
-      val msg = "trySepBy1 given empty input"
-      P.await1[A].flatMap(process1.init(_)).orElse(fail(msg))
-    }
+    attempt { sepBy1[A,D](in) }
 
   implicit class DecoderSyntax[A](A: Decoder[A]) {
     def ~[B](B: Decoder[B]): Decoder[(A,B)] = new Decoder[(A,B)] {
