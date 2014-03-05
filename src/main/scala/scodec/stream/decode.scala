@@ -77,6 +77,43 @@ object decode {
       )
     }
 
+  /**
+   * Like `[[scodec.stream.decode.sepBy]]`, but fails with an error if no
+   * elements are decoded. The returned stream will have at least one
+   * element if it succeeds.
+   */
+  def sepBy1[A:Decoder,D:Decoder](in: BitVector): Process[Task,A] =
+    sepBy[A,D](in) pipe {
+      val msg = "sepBy1 given empty input"
+      P.await1[A].flatMap(process1.init(_)).orElse(fail(msg))
+    }
+
+  /**
+   * Like [[scodec.stream.decode.sepBy]], but treats decoding errors as
+   * normal termination of the stream. Other errors are raised as normal
+   * within the stream.
+   */
+  def trySepBy[A:Decoder,D:Decoder](in: BitVector): Process[Task,A] =
+    sepBy[A,D](in).attempt().flatMap {
+      _.fold(
+        { case e@DecodingError(_) => P.halt
+          case e: Throwable => P.fail(e)
+        },
+        P.emit
+      )
+    }
+
+  /**
+   * Like [[scodec.stream.decode.trySepBy]], but fails with an error if no
+   * elements are decoded. The returned stream will have at least one
+   * element if it succeeds.
+   */
+  def trySepBy1[A:Decoder,D:Decoder](in: BitVector): Process[Task,A] =
+    trySepBy[A,D](in) pipe {
+      val msg = "trySepBy1 given empty input"
+      P.await1[A].flatMap(process1.init(_)).orElse(fail(msg))
+    }
+
   implicit class DecoderSyntax[A](A: Decoder[A]) {
     def ~[B](B: Decoder[B]): Decoder[(A,B)] = new Decoder[(A,B)] {
       def decode(bits: BitVector) = Decoder.decodeBoth(A,B)(bits)
