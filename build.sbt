@@ -12,6 +12,7 @@ scalaVersion := "2.10.3"
 scalacOptions ++= Seq(
   "-feature",
   "-deprecation",
+  "-language:higherKinds",
   "-unchecked",
   "-Xcheckinit",
   "-Xlint",
