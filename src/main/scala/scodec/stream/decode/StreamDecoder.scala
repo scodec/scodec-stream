@@ -2,9 +2,10 @@ package scodec.stream.decode
 
 import java.io.InputStream
 import java.nio.channels.{FileChannel, ReadableByteChannel}
-import scalaz.MonadPlus
+import scalaz.{~>,MonadPlus}
 import scalaz.stream.{Process,Process1,Tee}
 import scalaz.concurrent.Task
+import scodec.Decoder
 import scodec.bits.BitVector
 
 /**
@@ -19,11 +20,23 @@ case class StreamDecoder[+A](process: Process[Cursor,A]) {
    * Convenience function for decoding a stream of `A` values
    * from the given `BitVector`. This function does not retain
    * a reference to `bits`, allowing it to be be garbage collected
-   * as the returned stream is traversed. See [[scodec.stream.decode.evaluate]]
-   * for further notes.
+   * as the returned stream is traversed.
    */
-  final def decode(bits: => BitVector): Process[Task,A] =
-    scodec.stream.decode.evaluate(bits)(process)
+  final def decode(bits: => BitVector): Process[Task,A] = Process.suspend {
+    var cur = bits
+    def set(bs: BitVector): Task[BitVector] = Task.delay {
+      cur = bs
+      cur
+    }
+    process.translate(new (Cursor ~> Task) {
+      def apply[A](c: Cursor[A]): Task[A] = Task.suspend {
+        c.run(cur).fold(
+          msg => Task.fail(DecodingError(msg)),
+          { case (rem,a) => set(rem).flatMap { _ => Task.now(a) }}
+        )
+      }
+    })
+  }
 
   /**
    * Resource-safe version of `decode`. Acquires a resource,
@@ -125,25 +138,23 @@ case class StreamDecoder[+A](process: Process[Cursor,A]) {
 
   /**
    * Combine the output of this `StreamDecoder` with another streaming
-   * decoder, using the given binary stream transducer.
+   * decoder, using the given binary stream transducer. Note that both
+   * `d` and `this` will operate on the same input `BitVector`, so this
+   * combinator is more useful for expressing alternation between two
+   * decoders.
    */
   final def tee[B,C](d: StreamDecoder[B])(t: Tee[A,B,C]): StreamDecoder[C] =
     edit { _.tee(d.process)(t) }
+
+  /**
+   * Alternate between decoding `A` values using this `StreamDecoder`,
+   * and decoding `B` values which are ignored.
+   */
+  final def sepBy[B:Decoder]: StreamDecoder[A] =
+    tee(scodec.stream.decode.many[B])((Process.awaitL[A] fby Process.awaitR[B].drain).repeat)
 }
 
 object StreamDecoder {
-
-  /** The decoder that consumes no input and emits no values. */
-  val halt: StreamDecoder[Nothing] = StreamDecoder(Process.halt)
-
-  /** The decoder that consumes no input and halts with the given error. */
-  def fail(err: Throwable): StreamDecoder[Nothing] = StreamDecoder(Process.fail(err))
-
-  /** The decoder that consumes no input, emits the given `a`, then halts. */
-  def emit[A](a: A): StreamDecoder[A] = StreamDecoder(Process.emit(a))
-
-  /** The decoder that consumes no input, emits the given `A` values, then halts. */
-  def emitAll[A](as: Seq[A]): StreamDecoder[A] = StreamDecoder(Process.emitAll(as))
 
   /** `MonadPlus` instance for `StreamDecoder`. The `plus` operation is `++`. */
   implicit val instance = new MonadPlus[StreamDecoder] {
