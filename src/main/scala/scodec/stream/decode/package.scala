@@ -74,7 +74,7 @@ package object decode {
    * results. This function does not retain a reference to `bits` and allows
    * for `bits` to be garbage collected as the output stream is traversed.
    */
-  def run[A](bits: => BitVector)(p: Process[Cursor,A]): Process[Task,A] = {
+  def evaluate[A](bits: => BitVector)(p: Process[Cursor,A]): Process[Task,A] = {
     var cur = bits
     def set(bs: BitVector): Task[BitVector] = Task.delay {
       cur = bs
