@@ -1,7 +1,11 @@
 *.class
 *.log
+*.un~
+*.swp
 
 # sbt specific
+sbt
+.lib/
 dist/*
 target/
 lib_managed/
