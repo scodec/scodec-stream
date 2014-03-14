@@ -20,10 +20,10 @@ object SpaceLeakTest extends Properties("space-leak") {
     val chunk = (0 until M).toIndexedSeq
     def chunks = BitVector.unfold(0)(_ => Some(ints.encodeValid(chunk) -> 0))
     val dec = many(ints).take(N)
-            . flatMap(chunk => Process.emitAll(chunk))
+            . flatMap(chunk => emitAll(chunk))
             . pipe(process1.sum)
 
-    val r = run(chunks) { dec }
+    val r = dec.decode(chunks)
     r.runLastOr(0).run == (0 until M).sum * N
   }
 }

@@ -53,7 +53,8 @@ package object decode {
   def take(n: Long): StreamDecoder[BitVector] =
     StreamDecoder { Process.eval(Cursor.modify(_.take(n))) }
 
-  def decode[A](in: BitVector)(implicit A: Decoder[A]): StreamDecoder[A] =
+  /** Run the given `Decoder[A]` on `in`, returning its result as a `StreamDecoder`. */
+  private[decode] def runDecode[A](in: BitVector)(implicit A: Decoder[A]): StreamDecoder[A] =
     A.decode(in).fold(
       fail,
       { case (rem,a) => set(rem) ++ emit(a) }
@@ -61,11 +62,12 @@ package object decode {
 
   /** Run the given `Decoder` once and emit its result, if successful. */
   def once[A](implicit A: Decoder[A]): StreamDecoder[A] =
-    ask flatMap { decode[A] }
+    ask flatMap { runDecode[A] }
 
   /**
-   * Like [[scodec.stream.decode.once]], but treats decoding failures
-   * like normal termination. This is useful for allowing
+   * Like [[scodec.stream.decode.once]], but halts normally and leaves the
+   * input unconsumed in the event of a decoding error. `tryOnce[A].repeat`
+   * will produce the same result as `many[A]`, but allows.
    */
   def tryOnce[A](implicit A: Decoder[A]): StreamDecoder[A] = ask flatMap { in =>
     A.decode(in).fold(
@@ -103,7 +105,7 @@ package object decode {
    * element if it succeeds.
    */
   def many1[A:Decoder]: StreamDecoder[A] =
-    nonEmpty("many1 given empty input")(many[A])
+    many[A].nonEmpty("many1 produced no outputs")
 
   /**
    * Like `many`, but parses and ignores a `D` delimiter value in between
@@ -120,23 +122,13 @@ package object decode {
    * element if it succeeds.
    */
   def sepBy1[A:Decoder,D:Decoder]: StreamDecoder[A] =
-    nonEmpty ("sepBy1 given empty input") { sepBy[A,D] }
+    sepBy[A,D].nonEmpty("sepBy1 given empty input")
 
   private implicit class DecoderSyntax[A](A: Decoder[A]) {
     def ~[B](B: Decoder[B]): Decoder[(A,B)] = new Decoder[(A,B)] {
       def decode(bits: BitVector) = Decoder.decodeBoth(A,B)(bits)
     }
   }
-
-  /**
-   * Raises a decoding error if the given decoder emits no results,
-   * otherwise runs `p` as normal.
-   */
-  def nonEmpty[A](messageIfEmpty: String)(p: StreamDecoder[A]): StreamDecoder[A] =
-    p pipe {
-      P.await1[A].flatMap(process1.init(_)).orElse(
-      P.fail(DecodingError(messageIfEmpty)))
-    }
 
 //
 //  ///**
