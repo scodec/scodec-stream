@@ -14,9 +14,15 @@ import scodec.bits.BitVector
  * use one of the decoding convenience methods on this class, rather
  * than using `process` directly.
  */
-case class StreamDecoder[+A](process: Process[Cursor,A]) {
+trait StreamDecoder[+A] {
 
   import scodec.stream.{decode => D}
+
+  /**
+   * The `Process` backing this `StreamDecoder`. All functions on `StreamDecoder`
+   * are defined in terms of this `Process.
+   */
+  def decoder: Process[Cursor,A]
 
   /**
    * Decoding a stream of `A` values from the given `BitVector`.
@@ -29,7 +35,7 @@ case class StreamDecoder[+A](process: Process[Cursor,A]) {
       cur = bs
       cur
     }
-    process.translate(new (Cursor ~> Task) {
+    decoder.translate(new (Cursor ~> Task) {
       def apply[A](c: Cursor[A]): Task[A] = Task.suspend {
         c.run(cur).fold(
           msg => Task.fail(DecodingError(msg)),
@@ -102,11 +108,11 @@ case class StreamDecoder[+A](process: Process[Cursor,A]) {
    * Run this `StreamDecoder`, then `d`, then concatenate the two streams.
    */
   final def ++[A2>:A](d: => StreamDecoder[A2]): StreamDecoder[A2] =
-    edit { _ ++ d.process }
+    edit { _ ++ d.decoder }
 
   /** Modify the `Process[Cursor,A]` backing this `StreamDecoder`. */
   final def edit[B](f: Process[Cursor,A] => Process[Cursor,B]): StreamDecoder[B] =
-    StreamDecoder { f(process) }
+    StreamDecoder { f(decoder) }
 
   /**
    * Monadic bind for this `StreamDecoder`. Runs a stream decoder for each `A`
@@ -114,7 +120,7 @@ case class StreamDecoder[+A](process: Process[Cursor,A]) {
    * streams of results. This is the same 'idea' as `List.flatMap`.
    */
   final def flatMap[B](f: A => StreamDecoder[B]): StreamDecoder[B] =
-    flatMapP(f andThen (_.process))
+    flatMapP(f andThen (_.decoder))
 
   /**
    * Like `flatMap`, but takes a function that produces a `Process[Cursor,B]`.
@@ -125,7 +131,7 @@ case class StreamDecoder[+A](process: Process[Cursor,A]) {
   /**
    * Run this `StreamDecoder` zero or more times until the input is exhausted.
    */
-  final def many: StreamDecoder[A] = {
+  def many: StreamDecoder[A] = {
     import scodec.stream.{decode => D}
     val step: StreamDecoder[A] =
       D.ask.flatMap { bits =>
@@ -138,7 +144,7 @@ case class StreamDecoder[+A](process: Process[Cursor,A]) {
   /**
    * Run this `StreamDecoder` one or more times until the input is exhausted.
    */
-  final def many1: StreamDecoder[A] =
+  def many1: StreamDecoder[A] =
     this.many.nonEmpty("many1 produced no outputs")
 
   /**
@@ -158,7 +164,7 @@ case class StreamDecoder[+A](process: Process[Cursor,A]) {
    * Raises a decoding error if the given decoder emits no results,
    * otherwise runs `p` as normal.
    */
-  final def nonEmpty(messageIfEmpty: String): StreamDecoder[A] =
+  def nonEmpty(messageIfEmpty: String): StreamDecoder[A] =
     pipe {
       Process.await1[A].flatMap(process1.init(_)).orElse(
       Process.fail(DecodingError(messageIfEmpty)))
@@ -172,7 +178,7 @@ case class StreamDecoder[+A](process: Process[Cursor,A]) {
    * backtracking should be handled by `this`.
    */
   final def or[A2>:A](d: StreamDecoder[A2]): StreamDecoder[A2] =
-    scodec.stream.decode.or(this, d)
+    D.or(this, d)
 
   /** Operator alias for `this.or(d)`. */
   final def |[A2>:A](d: StreamDecoder[A2]): StreamDecoder[A2] =
@@ -184,7 +190,7 @@ case class StreamDecoder[+A](process: Process[Cursor,A]) {
    * `d` completes. See [[scalaz.stream.Process.onComplete]].
    */
   final def onComplete[A2>:A](d: => StreamDecoder[A2]): StreamDecoder[A2] =
-    edit { _ onComplete d.process }
+    edit { _ onComplete d.decoder }
 
   /**
    * Transform the output of this `StreamDecoder` using the given
@@ -197,11 +203,11 @@ case class StreamDecoder[+A](process: Process[Cursor,A]) {
    * Alternate between decoding `A` values using this `StreamDecoder`,
    * and decoding `B` values which are ignored.
    */
-  final def sepBy[B:Decoder]: StreamDecoder[A] =
-    tee(scodec.stream.decode.many[B])((Process.awaitL[A] fby Process.awaitR[B].drain).repeat)
+  def sepBy[B:Decoder]: StreamDecoder[A] =
+    tee(D.many[B])((Process.awaitL[A] fby Process.awaitR[B].drain).repeat)
 
   /** Decode at most `n` values using this `StreamDecoder`. */
-  final def take(n: Int): StreamDecoder[A] =
+  def take(n: Int): StreamDecoder[A] =
     edit { _.take(n) }
 
   /**
@@ -212,12 +218,15 @@ case class StreamDecoder[+A](process: Process[Cursor,A]) {
    * decoders.
    */
   final def tee[B,C](d: StreamDecoder[B])(t: Tee[A,B,C]): StreamDecoder[C] =
-    edit { _.tee(d.process)(t) }
-
-  // add alias for `or`
+    edit { _.tee(d.decoder)(t) }
 }
 
 object StreamDecoder {
+
+  /** Create a `StreamDecoder[A]` from a `Process[Cursor,A]`. */
+  def apply[A](d: Process[Cursor,A]): StreamDecoder[A] = new StreamDecoder[A] {
+    def decoder = d
+  }
 
   /** `MonadPlus` instance for `StreamDecoder`. The `plus` operation is `++`. */
   implicit val instance = new MonadPlus[StreamDecoder] {
