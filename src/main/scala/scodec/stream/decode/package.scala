@@ -77,16 +77,13 @@ package object decode {
   }
 
   /**
-   * Runs `p1`, then runs `p2` if `p1` emits no elements and consumes
-   * none of the input. Example `or(tryOnce(codecs.int32), once(codecs.uint32))`.
+   * Runs `p1`, then runs `p2` if `p1` emits no elements.
+   * Example: `or(tryOnce(codecs.int32), once(codecs.uint32))`.
+   * This function does no backtracking of its own; backtracking
+   * should be handled by `p1`.
    */
   def or[A](p1: StreamDecoder[A], p2: StreamDecoder[A]) =
-    ask flatMap { s0 =>
-      val freshP2 = ask flatMap { s1 => if (s0 eq s1) p2 else halt }
-      val joiner = // type annotation needed here for some reason :(
-        (P.awaitL[A].repeat: Tee[A,A,A]).orElse(P.awaitR[A].repeat)
-      p1.tee(freshP2)(joiner)
-    }
+    p1.tee(p2)((P.awaitL[A].repeat: Tee[A,A,A]) orElse P.awaitR[A].repeat)
 
   /**
    * Parse a stream of `A` values from the input, using the given decoder.

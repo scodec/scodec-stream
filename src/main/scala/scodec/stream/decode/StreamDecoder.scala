@@ -22,7 +22,7 @@ case class StreamDecoder[+A](process: Process[Cursor,A]) {
    * it to be be garbage collected as the returned stream is traversed.
    */
   final def decode(bits: => BitVector): Process[Task,A] = Process.suspend {
-    var cur = bits
+    var cur = bits // think about whether this needs to be volatile
     def set(bs: BitVector): Task[BitVector] = Task.delay {
       cur = bs
       cur
@@ -127,20 +127,34 @@ case class StreamDecoder[+A](process: Process[Cursor,A]) {
     this.many.nonEmpty("many1 produced no outputs")
 
   /**
+   * Transform the output of this `StreamDecoder` using the function `f`.
+   */
+  final def map[B](f: A => B): StreamDecoder[B] =
+    edit { _ map f }
+
+  /**
    * Raises a decoding error if the given decoder emits no results,
    * otherwise runs `p` as normal.
    */
-  def nonEmpty(messageIfEmpty: String): StreamDecoder[A] =
+  final def nonEmpty(messageIfEmpty: String): StreamDecoder[A] =
     pipe {
       Process.await1[A].flatMap(process1.init(_)).orElse(
       Process.fail(DecodingError(messageIfEmpty)))
     }
 
   /**
-   * Transform the output of this `StreamDecoder` using the function `f`.
+   * Alias for `scodec.stream.decode.or(this,d)`.
+   * Runs `this`, then runs `d` if `this` emits no elements.
+   * Example: `tryOnce(codecs.int32).or(once(codecs.uint32))`.
+   * This function does no backtracking of its own; any desired
+   * backtracking should be handled by `this`.
    */
-  final def map[B](f: A => B): StreamDecoder[B] =
-    edit { _ map f }
+  final def or[A2>:A](d: StreamDecoder[A2]): StreamDecoder[A2] =
+    scodec.stream.decode.or(this, d)
+
+  /** Operator alias for `this.or(d)`. */
+  final def |[A2>:A](d: StreamDecoder[A2]): StreamDecoder[A2] =
+    this.or(d)
 
   /**
    * Run this `StreamDecoder`, then `d`, then concatenate the two streams,
@@ -177,6 +191,8 @@ case class StreamDecoder[+A](process: Process[Cursor,A]) {
    */
   final def tee[B,C](d: StreamDecoder[B])(t: Tee[A,B,C]): StreamDecoder[C] =
     edit { _.tee(d.process)(t) }
+
+  // add alias for `or`
 }
 
 object StreamDecoder {
