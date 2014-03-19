@@ -2,7 +2,7 @@ package scodec.stream.decode
 
 import java.io.InputStream
 import java.nio.channels.{FileChannel, ReadableByteChannel}
-import scalaz.{~>,MonadPlus}
+import scalaz.{~>,\/,MonadPlus}
 import scalaz.stream.{Process,Process1,process1,Tee}
 import scalaz.concurrent.Task
 import scodec.Decoder
@@ -16,13 +16,15 @@ import scodec.bits.BitVector
  */
 case class StreamDecoder[+A](process: Process[Cursor,A]) {
 
+  import scodec.stream.{decode => D}
+
   /**
    * Decoding a stream of `A` values from the given `BitVector`.
    * This function does not retain a reference to `bits`, allowing
    * it to be be garbage collected as the returned stream is traversed.
    */
   final def decode(bits: => BitVector): Process[Task,A] = Process.suspend {
-    var cur = bits // think about whether this needs to be volatile
+    @volatile var cur = bits // am pretty sure this doesn't need to be volatile, but just being safe
     def set(bs: BitVector): Task[BitVector] = Task.delay {
       cur = bs
       cur
@@ -112,7 +114,13 @@ case class StreamDecoder[+A](process: Process[Cursor,A]) {
    * streams of results. This is the same 'idea' as `List.flatMap`.
    */
   final def flatMap[B](f: A => StreamDecoder[B]): StreamDecoder[B] =
-    edit { _ flatMap (f andThen (_.process)) }
+    flatMapP(f andThen (_.process))
+
+  /**
+   * Like `flatMap`, but takes a function that produces a `Process[Cursor,B]`.
+   */
+  final def flatMapP[B](f: A => Process[Cursor,B]): StreamDecoder[B] =
+    edit { _ flatMap f }
 
   /**
    * Run this `StreamDecoder` zero or more times until the input is exhausted.
@@ -138,6 +146,13 @@ case class StreamDecoder[+A](process: Process[Cursor,A]) {
    */
   final def map[B](f: A => B): StreamDecoder[B] =
     edit { _ map f }
+
+  /**
+   * Transform the output of this `StreamDecoder`, converting left values
+   * to decoding failures.
+   */
+  final def mapEither[B](f: A => String \/ B): StreamDecoder[B] =
+    this.flatMap { a => f(a).fold(D.fail, D.emit) }
 
   /**
    * Raises a decoding error if the given decoder emits no results,
