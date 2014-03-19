@@ -32,7 +32,7 @@ parallelExecution in Test := false
 resolvers += "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"
 
 libraryDependencies ++= Seq(
-  "org.typelevel" %% "scodec-core" % "1.0.0-RC1",
+  "org.typelevel" %% "scodec-core" % "1.0.0-RC2",
   "org.scalaz.stream" %% "scalaz-stream" % "0.3.1",
   "org.scalatest" %% "scalatest" % "2.0" % "test",
   "org.scalacheck" %% "scalacheck" % "1.10.1" % "test"
