@@ -117,8 +117,15 @@ case class StreamDecoder[+A](process: Process[Cursor,A]) {
   /**
    * Run this `StreamDecoder` zero or more times until the input is exhausted.
    */
-  final def many: StreamDecoder[A] =
-    edit { _.repeat }
+  final def many: StreamDecoder[A] = {
+    import scodec.stream.{decode => D}
+    val step: StreamDecoder[A] =
+      D.ask.flatMap { bits =>
+        if (bits.isEmpty) D.halt
+        else this
+      }
+    step edit { _.repeat }
+  }
 
   /**
    * Run this `StreamDecoder` one or more times until the input is exhausted.
