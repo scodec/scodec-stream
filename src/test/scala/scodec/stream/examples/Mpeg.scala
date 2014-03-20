@@ -42,8 +42,8 @@ object Mpeg extends App {
       decode.isolate(recordHeader.includedLength * 8) {
         // Drop 22 byte ethernet frame header and 20 byte IPv4/udp header
         decode.advance((22 + 20) * 8) ++
-        // skip any packets that fail to parse as MpegPacket
-        decode.tryOnce[MpegPacket].many
+        // bail on this record if we fail to parse an `MpegPacket` from it
+        decode.tryMany[MpegPacket]
       }
     }
   } yield packet
@@ -51,7 +51,7 @@ object Mpeg extends App {
   print("Enter path to a large pcap mpeg file: ")
   val line = readLine()
   val channel = new FileInputStream(new File(line)).getChannel
-  val result = streamier.decodeMmap(channel).runFoldMap(_ => 1).run
+  val result = streamier.decodeMmap(channel).map(_ => 1).fold(0)(_ + _).runLastOr(0).run
   println(result)
 }
 

@@ -59,8 +59,8 @@ package object decode {
    */
   def isolate[A](numberOfBits: Long)(d: => StreamDecoder[A]): StreamDecoder[A] =
     ask.map(Box(_)).flatMap { bits =>
-      val rem = bits.get.drop(numberOfBits) // we advance right away
-      bits.clear                            // then clear the reference to bits to allow gc
+      val rem = bits.get.drop(numberOfBits) // advance cursor right away
+      bits.clear()                          // then clear the reference to bits to allow gc
       take(numberOfBits).edit(_.drain) ++ d ++ set(rem)
     }
 
@@ -88,6 +88,16 @@ package object decode {
   }
 
   /**
+   * Like [[scodec.stream.decode.many]], but in the event of a decoding error,
+   * resets cursor to end of last successful decode, then halts normally.
+   */
+  def tryMany[A](implicit A: Decoder[A]): StreamDecoder[A] =
+    tryOnce(A).map(Some(_)).or(emit(None)).flatMapP {
+      case None => P.halt
+      case Some(a) => P.emit(a)
+    }
+
+  /**
    * Runs `p1`, then runs `p2` if `p1` emits no elements.
    * Example: `or(tryOnce(codecs.int32), once(codecs.uint32))`.
    * This function does no backtracking of its own; backtracking
@@ -102,10 +112,8 @@ package object decode {
    * exhausts `in` and leaves no trailing bits. The returned stream terminates
    * with an error if the `Decoder[A]` ever fails on the input.
    */
-  def many[A](implicit A: Decoder[A]): StreamDecoder[A] = ask flatMap { in =>
-    if (in.isEmpty) halt
-    else once(A) ++ many(A)
-  }
+  def many[A](implicit A: Decoder[A]): StreamDecoder[A] =
+    once[A].many
 
   /**
    * Like [[scodec.stream.decode.many]], but fails with an error if no
