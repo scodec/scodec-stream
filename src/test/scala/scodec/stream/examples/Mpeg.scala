@@ -36,18 +36,18 @@ object Mpeg extends App {
     mpegPcapDecoder
   }
 
-  val streamier: StreamDecoder[MpegPacket] = {
-    decode.once[PcapHeader].flatMap { header =>
-      {
-        for {
-          recordHeader <- decode.once(pcapRecordHeader(header.ordering))
-          _ <- decode.take(recordHeader.includedLength * 8)
-          _ <- decode.drop((22 + 20) * 8)
-          packets <- decode.many[MpegPacket]
-        } yield packets
-      }.many
+  val streamier: StreamDecoder[MpegPacket] = for {
+    header <- decode.once[PcapHeader]
+    packet <- decode.many(pcapRecordHeader(header.ordering)) flatMap { recordHeader =>
+      decode.isolate(recordHeader.includedLength * 8) {
+        // Drop 22 byte ethernet frame header and 20 byte IPv4/udp header
+        decode.advance((22 + 20) * 8) ++
+        // skip any packets that fail to parse as MpegPacket
+        decode.tryOnce[MpegPacket].many
+      }
     }
-  }
+  } yield packet
+
   print("Enter path to a large pcap mpeg file: ")
   val line = readLine()
   val channel = new FileInputStream(new File(line)).getChannel

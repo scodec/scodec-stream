@@ -53,6 +53,17 @@ package object decode {
   def take(n: Long): StreamDecoder[BitVector] =
     StreamDecoder { Process.eval(Cursor.modify(_.take(n))) }
 
+  /**
+   * Run the given `StreamDecoder` using only the first `numberOfBits` bits of
+   * the current stream, then advance the cursor by that many bits on completion.
+   */
+  def isolate[A](numberOfBits: Long)(d: => StreamDecoder[A]): StreamDecoder[A] =
+    ask.map(Box(_)).flatMap { bits =>
+      val rem = bits.get.drop(numberOfBits) // we advance right away
+      bits.clear                            // then clear the reference to bits to allow gc
+      take(numberOfBits).edit(_.drain) ++ d ++ set(rem)
+    }
+
   /** Run the given `Decoder[A]` on `in`, returning its result as a `StreamDecoder`. */
   private[decode] def runDecode[A](in: BitVector)(implicit A: Decoder[A]): StreamDecoder[A] =
     A.decode(in).fold(
@@ -127,15 +138,9 @@ package object decode {
     }
   }
 
-//
-//  ///**
-//  // * If `p` terminates with a decoding error, halt normally and reset the
-//  // * cursor back to the current position. If `p` succeeds, advance the
-//  // * cursor as normal.
-//  // */
-//  //def attempt[A](p: StreamDecoder[A]): StreamDecoder[A] =
-//  //  // this would be nice, but not possible with current scalaz-stream rep,
-//  //  // which requires being in Task or some other Catchable to do a `.attempt()`
-//  //  ???
+}
 
+// mutable reference that we can null out for GC purposes
+private[stream] case class Box[A>:Null](var get: A) {
+  def clear(): Unit = get = null
 }
