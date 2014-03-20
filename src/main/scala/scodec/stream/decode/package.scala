@@ -92,9 +92,9 @@ package object decode {
    * resets cursor to end of last successful decode, then halts normally.
    */
   def tryMany[A](implicit A: Decoder[A]): StreamDecoder[A] =
-    tryOnce(A).map(Some(_)).or(emit(None)).flatMapP {
-      case None => P.halt
-      case Some(a) => P.emit(a)
+    tryOnce(A).map(Some(_)).or(emit(None)).flatMap {
+      case None => halt
+      case Some(a) => emit(a) ++ tryMany[A]
     }
 
   /**

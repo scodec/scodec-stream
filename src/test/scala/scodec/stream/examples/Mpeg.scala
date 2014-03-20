@@ -48,12 +48,20 @@ object Mpeg extends App {
     }
   } yield packet
 
+  def time[A](label: String)(a: => A): A = {
+    val start = System.currentTimeMillis
+    val result = a
+    val stop = System.currentTimeMillis
+    println(s"$label took ${(stop.toDouble-start) / 1000.0} s")
+    result
+  }
   print("Enter path to a large pcap mpeg file: ")
   val line = readLine()
-  val channel = new FileInputStream(new File(line)).getChannel
-  // val result = streamier.decodeMmap(channel).runFoldMap(_ => 1).run
-  val result = streamThroughRecordsOnly.decodeMmap(channel).runFoldMap(_ => 1).run
-  println(result)
+  def channel = new FileInputStream(new File(line)).getChannel
+  val result2 = time("coarse-grained") { streamThroughRecordsOnly.decodeMmap(channel).runFoldMap(_ => 1).run }
+  val result1 = time("fine-grained") { streamier.decodeMmap(channel).runFoldMap(_ => 1).run }
+  println("fine-grained stream packet count: " + result1)
+  println("coarse-grained stream packet count: " + result2)
 }
 
 
