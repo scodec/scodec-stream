@@ -1,6 +1,5 @@
 package scodec.stream.decode
 
-import java.lang.ref.WeakReference
 import org.scalacheck._
 import Prop._
 import scala.concurrent.duration._

@@ -132,13 +132,11 @@ trait StreamDecoder[+A] {
    * Run this `StreamDecoder` zero or more times until the input is exhausted.
    */
   def many: StreamDecoder[A] = {
-    import scodec.stream.{decode => D}
-    val step: StreamDecoder[A] =
-      D.ask.flatMap { bits =>
-        if (bits.isEmpty) D.halt
-        else this
-      }
-    step edit { _.repeat }
+    lazy val go: StreamDecoder[A] = D.ask.flatMap { bits =>
+      if (bits.isEmpty) D.halt
+      else this ++ go
+    }
+    go
   }
 
   /**
