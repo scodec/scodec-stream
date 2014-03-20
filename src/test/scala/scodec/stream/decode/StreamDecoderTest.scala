@@ -33,6 +33,8 @@ object StreamDecoderTest extends Properties("StreamDecoder") {
       def decode(bits: BitVector) = left(msg)
     }
     val failing = tryOnce(uint8.flatMap { _ => fail("!!!") })
+    // NB: this fails as expected - since `once` does not backtrack
+    // val failing = once(uint8.flatMap { _ => fail("!!!") })
     val p5 = failing or p1
     val p6 = p2 or failing
 
