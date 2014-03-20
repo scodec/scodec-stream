@@ -51,7 +51,8 @@ object Mpeg extends App {
   print("Enter path to a large pcap mpeg file: ")
   val line = readLine()
   val channel = new FileInputStream(new File(line)).getChannel
-  val result = streamier.decodeMmap(channel).map(_ => 1).fold(0)(_ + _).runLastOr(0).run
+  // val result = streamier.decodeMmap(channel).runFoldMap(_ => 1).run
+  val result = streamThroughRecordsOnly.decodeMmap(channel).runFoldMap(_ => 1).run
   println(result)
 }
 
