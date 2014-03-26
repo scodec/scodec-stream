@@ -15,31 +15,31 @@ package object decode {
 
   /** The decoder that consumes no input and emits no values. */
   val halt: StreamDecoder[Nothing] =
-    StreamDecoder { P.halt }
+    StreamDecoder.instance { P.halt }
 
   /** The decoder that consumes no input and halts with the given error. */
   def fail(err: Throwable): StreamDecoder[Nothing] =
-    StreamDecoder { P.fail(err) }
+    StreamDecoder.instance { P.fail(err) }
 
   /** The decoder that consumes no input and halts with the given error message. */
   def fail(msg: String): StreamDecoder[Nothing] =
-    StreamDecoder { P.fail(DecodingError(msg)) }
+    StreamDecoder.instance { P.fail(DecodingError(msg)) }
 
   /** The decoder that consumes no input, emits the given `a`, then halts. */
   def emit[A](a: A): StreamDecoder[A] =
-    StreamDecoder { P.emit(a) }
+    StreamDecoder.instance { P.emit(a) }
 
   /** The decoder that consumes no input, emits the given `A` values, then halts. */
   def emitAll[A](as: Seq[A]): StreamDecoder[A] =
-    StreamDecoder { Process.emitAll(as) }
+    StreamDecoder.instance { Process.emitAll(as) }
 
   /** Obtain the current input. This stream returns a single element. */
   def ask: StreamDecoder[BitVector] =
-    StreamDecoder { Process.eval(Cursor.ask) }
+    StreamDecoder.instance { Process.eval(Cursor.ask) }
 
   /** Advance the input by the given number of bits. */
   def drop(n: Long): StreamDecoder[BitVector] =
-    StreamDecoder { Process.eval(Cursor.modify(_.drop(n))) }
+    StreamDecoder.instance { Process.eval(Cursor.modify(_.drop(n))) }
 
   /** Advance the input by the given number of bits, purely as an effect. */
   def advance(n: Long): StreamDecoder[Nothing] =
@@ -47,11 +47,11 @@ package object decode {
 
   /** Set the current cursor to the given `BitVector`. */
   def set(bits: BitVector): StreamDecoder[Nothing] =
-    StreamDecoder { Process.eval_(Cursor.set(bits)) }
+    StreamDecoder.instance { Process.eval_(Cursor.set(bits)) }
 
   /** Trim the input by calling `take(n)` on the input `BitVector`. */
   def take(n: Long): StreamDecoder[BitVector] =
-    StreamDecoder { Process.eval(Cursor.modify(_.take(n))) }
+    StreamDecoder.instance { Process.eval(Cursor.modify(_.take(n))) }
 
   /**
    * Run the given `StreamDecoder` using only the first `numberOfBits` bits of

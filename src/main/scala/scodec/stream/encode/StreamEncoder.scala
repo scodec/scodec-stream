@@ -16,7 +16,7 @@ trait StreamEncoder[-A] {
 
   /** Modify the `Process1` backing this `StreamEncoder`. */
   final def edit[A2](f: Process1[A,BitVector] => Process1[A2,BitVector]): StreamEncoder[A2] =
-    StreamEncoder { f(encoder) }
+    StreamEncoder.instance { f(encoder) }
 
   /** Encode the input stream of `A` values using this `StreamEncoder`. */
   final def encode[F[_]](in: Process[F,A]): Process[F,BitVector] =
@@ -42,7 +42,10 @@ trait StreamEncoder[-A] {
 object StreamEncoder {
 
   /** Create a `StreamEncoder` from the given `Process1`. */
-  def apply[A](p: Process1[A,BitVector]): StreamEncoder[A] = new StreamEncoder[A] {
+  def instance[A](p: Process1[A,BitVector]): StreamEncoder[A] = new StreamEncoder[A] {
     def encoder = p
   }
+
+  /** Conjure up a `StreamEncoder[A]` from implicit scope. */
+  def apply[A](implicit A: StreamEncoder[A]): StreamEncoder[A] = A
 }

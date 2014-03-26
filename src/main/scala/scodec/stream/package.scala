@@ -8,4 +8,8 @@ package object stream {
   val StreamDecoder = scodec.stream.decode.StreamDecoder
 
   type StreamEncoder[-A] = scodec.stream.encode.StreamEncoder[A]
+  val StreamEncoder = scodec.stream.encode.StreamEncoder
+
+  type StreamCodec[A] = scodec.stream.codec.StreamCodec[A]
+  val StreamCodec = scodec.stream.codec.StreamCodec
 }

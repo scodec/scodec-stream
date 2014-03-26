@@ -112,7 +112,7 @@ trait StreamDecoder[+A] {
 
   /** Modify the `Process[Cursor,A]` backing this `StreamDecoder`. */
   final def edit[B](f: Process[Cursor,A] => Process[Cursor,B]): StreamDecoder[B] =
-    StreamDecoder { f(decoder) }
+    StreamDecoder.instance { f(decoder) }
 
   /**
    * Monadic bind for this `StreamDecoder`. Runs a stream decoder for each `A`
@@ -225,9 +225,12 @@ trait StreamDecoder[+A] {
 object StreamDecoder {
 
   /** Create a `StreamDecoder[A]` from a `Process[Cursor,A]`. */
-  def apply[A](d: Process[Cursor,A]): StreamDecoder[A] = new StreamDecoder[A] {
+  def instance[A](d: Process[Cursor,A]): StreamDecoder[A] = new StreamDecoder[A] {
     def decoder = d
   }
+
+  /** Conjure up a `StreamDecoder[A]` from implicit scope. */
+  def apply[A](implicit A: StreamDecoder[A]): StreamDecoder[A] = A
 
   /** `MonadPlus` instance for `StreamDecoder`. The `plus` operation is `++`. */
   implicit val instance = new MonadPlus[StreamDecoder] {
