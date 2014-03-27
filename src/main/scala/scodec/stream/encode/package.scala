@@ -1,6 +1,7 @@
 package scodec.stream
 
 import scodec.Encoder
+import scodec.bits.BitVector
 import scalaz.stream.{Process => P}
 
 package object encode {
@@ -17,6 +18,10 @@ package object encode {
   val halt: StreamEncoder[Nothing] =
     StreamEncoder.instance { P.halt }
 
+  /** A `StreamEncoder` which encodes a stream of values. */
+  def many[A](implicit A: Encoder[A]): StreamEncoder[A] =
+    once[A].many
+
   /** A `StreamEncoder` which encodes a single value, then halts. */
   def once[A](implicit A: Encoder[A]): StreamEncoder[A] = StreamEncoder.instance {
     P.await1[A].flatMap { a => A.encode(a).fold(
@@ -24,6 +29,10 @@ package object encode {
       P.emit
     )}
   }
+
+  /** A `StreamEncoder` that emits the given `BitVector`, then halts. */
+  def literal(bits: BitVector): StreamEncoder[Nothing] =
+    StreamEncoder.instance { scalaz.stream.Process.emit(bits) }
 
   /**
    * A `StreamEncoder` which encodes a single value, then halts.

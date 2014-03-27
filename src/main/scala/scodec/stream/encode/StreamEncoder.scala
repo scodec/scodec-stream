@@ -1,6 +1,6 @@
 package scodec.stream.encode
 
-import scalaz.stream.{Process,Process1,process1}
+import scalaz.stream.{Process,Process1,process1,tee,Tee}
 import scodec.bits.BitVector
 
 /**
@@ -30,6 +30,14 @@ trait StreamEncoder[-A] {
   final def contrapipe[A0](p: Process1[A0,A]): StreamEncoder[A0] =
     edit { p pipe _ }
 
+  /** Transform the output `BitVector` values produced by this encoder. */
+  def mapBits(f: BitVector => BitVector): StreamEncoder[A] =
+    pipeBits(process1.lift(f))
+
+  /** Statefully transform the output `BitVector` values produced by this encoder. */
+  def pipeBits(f: Process1[BitVector,BitVector]): StreamEncoder[A] =
+    edit { _ pipe f }
+
   /** Encode values as long as there are more inputs. */
   def many: StreamEncoder[A] =
     edit { _.repeat }
@@ -37,6 +45,10 @@ trait StreamEncoder[-A] {
   /** Encode at most `n` values. */
   def take(n: Int): StreamEncoder[A] =
     contrapipe { process1.take(n) }
+
+  /** Run this `StreamEncoder`, followed by `e`. */
+  def ++[A2 <: A](e: StreamEncoder[A2]): StreamEncoder[A2] =
+    edit { _ ++ e.encoder }
 }
 
 object StreamEncoder {
