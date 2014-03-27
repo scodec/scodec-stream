@@ -3,11 +3,11 @@ import ReleaseStateTransformations._
 import ReleasePlugin._
 import ReleaseKeys._
 
-organization := "com.github.scodec"
+organization := "org.typelevel"
 
 name := "scodec-stream"
 
-scalaVersion := "2.10.3"
+scalaVersion := "2.10.4"
 
 scalacOptions ++= Seq(
   "-feature",
@@ -27,12 +27,10 @@ unmanagedResources in Compile <++= baseDirectory map { base => (base / "NOTICE")
 
 triggeredMessage := (_ => Watched.clearScreen)
 
-parallelExecution in Test := false
-
 resolvers += "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"
 
 libraryDependencies ++= Seq(
-  "org.typelevel" %% "scodec-core" % "1.0.0-RC2",
+  "org.typelevel" %% "scodec-core" % "1.0.0-SNAPSHOT",
   "org.scalaz.stream" %% "scalaz-stream" % "0.3.1",
   "org.scalatest" %% "scalatest" % "2.0" % "test",
   "org.scalacheck" %% "scalacheck" % "1.10.1" % "test"
