@@ -3,6 +3,7 @@ package scodec.stream.decode
 import org.scalacheck._
 import Prop._
 import scalaz.\/._
+import scalaz.stream.Process
 import scodec.bits.BitVector
 import scodec.Decoder
 import scodec.codecs._
@@ -42,6 +43,31 @@ object StreamDecoderTest extends Properties("StreamDecoder") {
     List(p1,p2,p3,p4,p5,p6).forall { p =>
       p.decode(bits).chunkAll.runLastOr(Vector()).run.toList == ints
     }
+  }
+
+  val string = variableSizeBytes(int32, utf8)
+
+  property("sepBy") = forAll { (ints: List[Int], delim: String) =>
+    import scodec.stream.encode
+    val e = encode.once(int32) ++ encode.many(int32).mapBits(string.encodeValid(delim) ++ _)
+    val encoded = e.encode(Process.emitAll(ints).toSource).runLog.run.foldLeft(BitVector.empty)(_ ++ _)
+    many(int32).sepBy(string).decode(encoded).runLog.run.toList == ints
+  }
+
+  property("decodeResource") = forAll { (strings: List[String]) =>
+    // make sure that cleanup action gets run
+    import scodec.stream.encode
+    val bits = repeated(string).encodeValid(strings.toIndexedSeq)
+    var cleanedUp = 0
+    val decoded = many(string).decodeResource(())(_ => bits, _ => cleanedUp += 1)
+    cleanedUp == 0 && // make sure we don't bump this strictly
+    decoded.runLog.run.toList == strings && // normal termination
+    decoded.take(2).runLog.run.toList == strings.take(2) && // early termination
+    { // exceptions
+      val failed = decoded.take(3).map(_ => { sys.error("die"); "fail" }).runLog.attemptRun.isLeft
+      strings.isEmpty || failed
+    } &&
+    cleanedUp == 3
   }
 }
 
