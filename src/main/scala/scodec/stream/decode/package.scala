@@ -53,6 +53,12 @@ package object decode {
   def take(n: Long): StreamDecoder[BitVector] =
     StreamDecoder.instance { Process.eval(Cursor.modify(_.take(n))) }
 
+  /** Produce a `StreamDecoder` lazily. */
+  def suspend[A](d: => StreamDecoder[A]): StreamDecoder[A] =
+    // a bit hacky - we are using an `ask` whose result is ignored
+    // just to give us an `Await` to guard production of `d`
+    ask.map(Box(_)).flatMap { bits => bits.clear(); d }
+
   /**
    * Run the given `StreamDecoder` using only the first `numberOfBits` bits of
    * the current stream, then advance the cursor by that many bits on completion.

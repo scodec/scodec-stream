@@ -16,6 +16,24 @@ object StreamDecoderTest extends Properties("StreamDecoder") {
     tryMany(int32).decode(bits).chunkAll.runLastOr(Vector()).run.toList == ints
   }
 
+  property("many1") = forAll { (ints: List[Int]) =>
+    val bits = repeated(int32).encodeValid(ints.toIndexedSeq)
+    many1(int32).decode(bits).chunkAll.runLastOr(Vector()).attemptRun.fold(
+      err => ints.isEmpty,
+      vec => vec.toList == ints
+    )
+  }
+
+  property("onComplete") = secure {
+    val bits = repeated(int32).encodeValid(Vector(1,2,3))
+    var cleanedUp = false
+    val dec: StreamDecoder[Int] = many1(int32)
+      .flatMap { _ => fail("oh noes!") }
+      .onComplete { suspend { cleanedUp = true; halt }}
+    cleanedUp == false &&
+    dec.decode(bits).run.attemptRun.isLeft
+  }
+
   property("isolate") = forAll { (ints: List[Int]) =>
     val bits = repeated(int32).encodeValid(ints.toIndexedSeq)
     val p =
