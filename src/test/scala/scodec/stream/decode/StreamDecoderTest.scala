@@ -16,6 +16,11 @@ object StreamDecoderTest extends Properties("StreamDecoder") {
     tryMany(int32).decode(bits).chunkAll.runLastOr(Vector()).run.toList == ints
   }
 
+  property("tryMany-example") = secure {
+    val bits = repeated(int32).encodeValid(Vector(1,2,3))
+    tryMany(int32).decode(bits).runLog.run.toList == List(1,2,3)
+  }
+
   property("many1") = forAll { (ints: List[Int]) =>
     val bits = repeated(int32).encodeValid(ints.toIndexedSeq)
     many1(int32).decode(bits).chunkAll.runLastOr(Vector()).attemptRun.fold(
