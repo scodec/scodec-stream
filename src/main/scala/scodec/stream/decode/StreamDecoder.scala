@@ -12,7 +12,7 @@ import scodec.bits.BitVector
  * A streaming decoding process, represented as a stream of state
  * actions on [[scodec.bits.BitVector]]. Most clients will typically
  * use one of the decoding convenience methods on this class, rather
- * than using `process` directly.
+ * than using `decoder` directly.
  */
 trait StreamDecoder[+A] {
 
