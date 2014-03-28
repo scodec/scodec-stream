@@ -34,8 +34,8 @@ resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repos
 libraryDependencies ++= Seq(
   "org.typelevel" %% "scodec-core" % "1.0.0-SNAPSHOT",
   "org.scalaz.stream" %% "scalaz-stream" % "0.3.1",
-  "org.scalatest" %% "scalatest" % "2.0" % "test",
-  "org.scalacheck" %% "scalacheck" % "1.10.1" % "test"
+  "org.scalatest" %% "scalatest" % "2.1.2" % "test",
+  "org.scalacheck" %% "scalacheck" % "1.11.3" % "test"
 )
 
 osgiSettings
