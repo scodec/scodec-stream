@@ -32,7 +32,7 @@ resolvers += "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"
 resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/"
 
 libraryDependencies ++= Seq(
-  "org.typelevel" %% "scodec-core" % "1.0.0-SNAPSHOT",
+  "org.typelevel" %% "scodec-core" % "1.0.0",
   "org.scalaz.stream" %% "scalaz-stream" % "0.3.1",
   "org.scalatest" %% "scalatest" % "2.1.2" % "test",
   "org.scalacheck" %% "scalacheck" % "1.11.3" % "test"
