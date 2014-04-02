@@ -14,6 +14,16 @@ trait StreamEncoder[-A] {
    */
   def encoder: Process1[A,BitVector]
 
+  /**
+   * Encode the given sequence of `A` values to a `BitVector`, raising an exception
+   * in the event of an encoding error.
+   */
+  def encodeAllValid(in: Seq[A]): BitVector =
+    Process.emitAll(in).toSource.pipe(encoder)
+           .fold(BitVector.empty)(_ ++ _)
+           .runLastOr(BitVector.empty)
+           .run
+
   /** Modify the `Process1` backing this `StreamEncoder`. */
   final def edit[A2](f: Process1[A,BitVector] => Process1[A2,BitVector]): StreamEncoder[A2] =
     StreamEncoder.instance { f(encoder) }
@@ -49,6 +59,21 @@ trait StreamEncoder[-A] {
   /** Run this `StreamEncoder`, followed by `e`. */
   def ++[A2 <: A](e: StreamEncoder[A2]): StreamEncoder[A2] =
     edit { _ ++ e.encoder }
+
+  /**
+   * Convert this `StreamEncoder` to output bits in the given chunk size.
+   * Only the last chunk may have fewer than `bitsPerChunk` bits.
+   */
+  def chunk(bitsPerChunk: Long): StreamEncoder[A] = {
+    def chunker(acc: BitVector): Process1[BitVector,BitVector] = {
+      if (acc.size >= bitsPerChunk)
+        Process.emit(acc.take(bitsPerChunk)) ++ chunker(acc.drop(bitsPerChunk))
+      else
+        Process.await1[BitVector].flatMap { bits => chunker(acc ++ bits) }
+                                 .orElse(Process.emit(acc))
+    }
+    this pipeBits { chunker(BitVector.empty) }
+  }
 }
 
 object StreamEncoder {

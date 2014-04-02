@@ -31,7 +31,7 @@ package object encode {
   }
 
   /** A `StreamEncoder` that emits the given `BitVector`, then halts. */
-  def literal(bits: BitVector): StreamEncoder[Nothing] =
+  def emit(bits: BitVector): StreamEncoder[Nothing] =
     StreamEncoder.instance { scalaz.stream.Process.emit(bits) }
 
   /**

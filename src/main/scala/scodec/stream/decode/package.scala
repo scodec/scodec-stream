@@ -37,6 +37,10 @@ package object decode {
   def ask: StreamDecoder[BitVector] =
     StreamDecoder.instance { Process.eval(Cursor.ask) }
 
+  /** Modify the current input. This stream returns a single element. */
+  def modify(f: BitVector => BitVector): StreamDecoder[BitVector] =
+    StreamDecoder.instance { Process.eval(Cursor.modify(f)) }
+
   /** Advance the input by the given number of bits. */
   def drop(n: Long): StreamDecoder[BitVector] =
     StreamDecoder.instance { Process.eval(Cursor.modify(_.drop(n))) }
@@ -69,6 +73,13 @@ package object decode {
       bits.clear()                          // then clear the reference to bits to allow gc
       take(numberOfBits).edit(_.drain) ++ d ++ set(rem)
     }
+
+  /**
+   * Run the given `StreamDecoder` using only the first `numberOfBytes` bytes of
+   * the current stream, then advance the cursor by that many bytes on completion.
+   */
+  def isolateBytes[A](numberOfBytes: Long)(d: => StreamDecoder[A]): StreamDecoder[A] =
+    isolate(numberOfBits = numberOfBytes * 8)(d)
 
   /** Run the given `Decoder[A]` on `in`, returning its result as a `StreamDecoder`. */
   private[decode] def runDecode[A](in: BitVector)(implicit A: Decoder[A]): StreamDecoder[A] =

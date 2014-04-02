@@ -25,6 +25,14 @@ trait StreamDecoder[+A] {
   def decoder: Process[Cursor,A]
 
   /**
+   * Decode the given `BitVector`, returning a strict `Vector` of
+   * the results, and throwing an exception in the event of a
+   * decoding error.
+   */
+  def decodeValidStrict(bits: => BitVector): Vector[A] =
+    decode(bits).chunkAll.runLastOr(Vector()).run
+
+  /**
    * Decoding a stream of `A` values from the given `BitVector`.
    * This function does not retain a reference to `bits`, allowing
    * it to be be garbage collected as the returned stream is traversed.
@@ -200,6 +208,10 @@ trait StreamDecoder[+A] {
   final def pipe[B](p: Process1[A,B]): StreamDecoder[B] =
     edit { _ pipe p }
 
+  /** Alias for `this pipe p`. */
+  final def |>[B](p: Process1[A,B]): StreamDecoder[B] =
+    pipe(p)
+
   /**
    * Alternate between decoding `A` values using this `StreamDecoder`,
    * and decoding `B` values which are ignored.
@@ -209,7 +221,23 @@ trait StreamDecoder[+A] {
 
   /** Decode at most `n` values using this `StreamDecoder`. */
   def take(n: Int): StreamDecoder[A] =
-    edit { _.take(n) }
+    edit { _ take n }
+
+  def takeWhile(f: A => Boolean): StreamDecoder[A] =
+    edit { _ takeWhile f }
+
+  def dropWhile(f: A => Boolean): StreamDecoder[A] =
+    edit { _ dropWhile f }
+
+  /**
+   * Equivalent to `dropWhile(f).take(1)` - returns a stream of (at most)
+   * one element, consisting of the first output for which `f` tests false.
+   */
+  def firstAfter(f: A => Boolean): StreamDecoder[A] =
+    dropWhile(f).take(1)
+
+  def drop(n: Int): StreamDecoder[A] =
+    edit { _ drop n }
 
   /**
    * Combine the output of this `StreamDecoder` with another streaming
