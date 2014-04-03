@@ -112,6 +112,8 @@ object StreamDecoderTest extends Properties("StreamDecoder") {
     }
   }
 
+  // move tests to root package and make them more round trippy to hit
+  // the encoders as well
   property("tryProcess") = {
     case class Chunk(get: Int)
     implicit val chunkSize = Arbitrary(Gen.choose(1,128).map(Chunk(_)))
