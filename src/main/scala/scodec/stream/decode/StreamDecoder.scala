@@ -29,7 +29,7 @@ trait StreamDecoder[+A] {
    * the results, and throwing an exception in the event of a
    * decoding error.
    */
-  def decodeValidStrict(bits: => BitVector): Vector[A] =
+  def decodeAllValid(bits: => BitVector): Vector[A] =
     decode(bits).chunkAll.runLastOr(Vector()).run
 
   /**
