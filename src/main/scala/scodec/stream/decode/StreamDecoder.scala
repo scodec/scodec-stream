@@ -223,11 +223,17 @@ trait StreamDecoder[+A] {
   def take(n: Int): StreamDecoder[A] =
     edit { _ take n }
 
+  /** Decode values as long as the predicate tests true. */
   def takeWhile(f: A => Boolean): StreamDecoder[A] =
     edit { _ takeWhile f }
 
+  /** Ignore decoded values as long as the predicate tests true. */
   def dropWhile(f: A => Boolean): StreamDecoder[A] =
     edit { _ dropWhile f }
+
+  /** Skip any decoded values for which the predicate tests false. */
+  def filter(f: A => Boolean): StreamDecoder[A] =
+    edit { _ filter f }
 
   /**
    * Equivalent to `dropWhile(f).take(1)` - returns a stream of (at most)
@@ -236,8 +242,12 @@ trait StreamDecoder[+A] {
   def firstAfter(f: A => Boolean): StreamDecoder[A] =
     dropWhile(f).take(1)
 
+  /** Ignore the first `n` decoded values. */
   def drop(n: Int): StreamDecoder[A] =
     edit { _ drop n }
+
+  /** Alias for `[[scodec.stream.decode.peek]](this)`. */
+  def peek: StreamDecoder[A] = D.peek(this)
 
   /**
    * Combine the output of this `StreamDecoder` with another streaming

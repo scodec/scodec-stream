@@ -79,8 +79,8 @@ object StreamDecoderTest extends Properties("StreamDecoder") {
 
   property("decodeResource") = forAll { (strings: List[String]) =>
     // make sure that cleanup action gets run
-    import scodec.stream.encode
-    val bits = repeated(string).encodeValid(strings.toIndexedSeq)
+    import scodec.stream.{encode => E}
+    val bits = E.once(string).many.encodeAllValid(strings)
     var cleanedUp = 0
     val decoded = many(string).decodeResource(())(_ => bits, _ => cleanedUp += 1)
     cleanedUp == 0 && // make sure we don't bump this strictly
@@ -91,6 +91,37 @@ object StreamDecoderTest extends Properties("StreamDecoder") {
       strings.isEmpty || failed
     } &&
     cleanedUp == 3
+  }
+
+  property("peek") = forAll { (strings: List[String]) =>
+    import scodec.stream.{encode => E}
+    val bits = E.once(string).many.encodeAllValid(strings)
+    val d = many(string).peek ++ many(string)
+    d.decodeValidStrict(bits).toList == (strings ++ strings)
+  }
+
+  property("process") = {
+    case class Chunk(get: Int)
+    implicit val chunkSize = Arbitrary(Gen.choose(32,64).map(Chunk(_)))
+    forAll { (ints: List[Int], chunkSize: Chunk) =>
+      import scodec.stream.{encode => E}
+      val bits = E.once(int32).many.encodeAllValid(ints)
+      val chunks = Process.emitSeq(bits.grouped(chunkSize.get)).toSource
+      val d = process(int32)
+      (chunks pipe d).runLog.run.toList == ints
+    }
+  }
+
+  property("tryProcess") = {
+    case class Chunk(get: Int)
+    implicit val chunkSize = Arbitrary(Gen.choose(1,128).map(Chunk(_)))
+    forAll { (strings: List[String], chunkSize: Chunk) =>
+      import scodec.stream.{encode => E}
+      val bits = E.many(string).encodeAllValid(strings)
+      val chunks = Process.emitSeq(bits.grouped(chunkSize.get)).toSource
+      val d = tryProcess(Long.MaxValue)(string)
+      (chunks pipe d).runLog.run.toList == strings
+    }
   }
 }
 

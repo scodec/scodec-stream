@@ -1,10 +1,10 @@
 package scodec
 package stream
 
-import scalaz.stream.{Process,process1}
-import scalaz.stream.{Process => P, Tee}
+import scalaz.stream.{Process,process1,Process1,Tee}
+import scalaz.stream.{Process => P}
 import scalaz.concurrent.Task
-import scalaz.{\/,~>,Monad,MonadPlus}
+import scalaz.{\/,-\/,\/-,~>,Monad,MonadPlus}
 import scodec.bits.BitVector
 
 /**
@@ -104,6 +104,66 @@ package object decode {
     )
   }
 
+  @annotation.tailrec
+  private def consume[A](A: Decoder[A])(bits: BitVector, acc: Vector[A]):
+      (BitVector, Vector[A], String) =
+    A.decode(bits) match {
+      case -\/(err) => (bits, acc, err)
+      case \/-((rem,a)) => consume(A)(rem, acc :+ a)
+    }
+
+  /**
+   * Promote a decoder to a `Process1`. The returned `Process1` may be
+   * given chunks larger than what is needed to decode a single element,
+   * and will buffer any leftover input, but a decoding error will result
+   * if the buffer size is ever less than what is needed to decode an `A`.
+   *
+   * This combinator relies on the decoder satisfying the following
+   * property: If successful on input `x`, `A` should also succeed with the
+   * same value given input `x ++ y`, for any choice of `y`. This ensures the
+   * decoder can be given more input than it needs without affecting
+   * correctness, and generally restricts this combinator to being used with
+   * "self-delimited" decoders. Using this combinator with a decoder not
+   * satisfying this property will make results highly dependent on the sequence
+   * of chunk sizes passed to the process.
+   */
+  def process[A](implicit A: Decoder[A]): Process1[BitVector,A] = {
+    def waiting(leftover: BitVector): Process1[BitVector,A] =
+      P.await1[BitVector] flatMap { bits =>
+        consume(A)(leftover ++ bits, Vector.empty) match {
+          case (rem, Vector(), lastError) => P.fail(DecodingError(lastError))
+          case (rem, out, _) => P.emitSeq(out) ++ waiting(rem)
+        }
+      }
+    waiting(BitVector.empty)
+  }
+
+  /**
+   * Like [[scodec.stream.decode.process]], but the returned process may be
+   * given chunks larger OR smaller than what is needed to decode a single element.
+   * After the buffer size has grown beyond `attemptBits`, decoding failures
+   * are raised rather than being treated as an indication that more input is needed.
+   * Without this argument, a failing decoder due to malformed input would eventually
+   * buffer the entire input before halting.
+   *
+   * In addition to the monotonicity requirement given in [[scodec.stream.decode.process]],
+   * we require also that if `A` fails on `x ++ y`, it must also fail for `x`, for
+   * any choices of `x` and `y`. This ensures that we can feed the decoder less
+   * than its expected input, and interpret failure as an indication that more input
+   * is needed.
+   */
+  def tryProcess[A](attemptBits: Long)(implicit A: Decoder[A]): Process1[BitVector,A] = {
+    def waiting(leftover: BitVector): Process1[BitVector,A] =
+      P.await1[BitVector] flatMap { bits =>
+        val buf = leftover ++ bits
+        consume(A)(buf, Vector.empty) match {
+          case (rem, Vector(), lastError) if buf.size > attemptBits => P.fail(DecodingError(lastError))
+          case (rem, out, _) => P.emitSeq(out) ++ waiting(rem)
+        }
+      }
+    waiting(BitVector.empty)
+  }
+
   /**
    * Like [[scodec.stream.decode.many]], but in the event of a decoding error,
    * resets cursor to end of last successful decode, then halts normally.
@@ -122,6 +182,14 @@ package object decode {
    */
   def or[A](p1: StreamDecoder[A], p2: StreamDecoder[A]) =
     p1.tee(p2)((P.awaitL[A].repeat: Tee[A,A,A]) orElse P.awaitR[A].repeat)
+
+  /**
+   * Run this decoder, but leave its input unconsumed. Note that this
+   * requires keeping the current stream in memory for as long as the
+   * given decoder takes to complete.
+   */
+  def peek[A](d: StreamDecoder[A]): StreamDecoder[A] =
+    ask flatMap { saved => d ++ set(saved) }
 
   /**
    * Parse a stream of `A` values from the input, using the given decoder.
