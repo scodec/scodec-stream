@@ -139,6 +139,9 @@ trait StreamDecoder[+A] {
   /** Alias for `decode.isolate(numberOfBits)(this)`. */
   def isolate(numberOfBits: Long): StreamDecoder[A] = D.isolate(numberOfBits)(this)
 
+  /** Alias for `decode.isolateBytes(numberOfBytes)(this)`. */
+  def isolateBytes(numberOfBytes: Long): StreamDecoder[A] = D.isolateBytes(numberOfBytes)(this)
+
   /**
    * Run this `StreamDecoder` zero or more times until the input is exhausted.
    */
