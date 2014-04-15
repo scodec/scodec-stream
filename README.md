@@ -19,14 +19,25 @@ val s: Process[scalaz.concurrent.Task, ByteVector] =
 
 When consumed, `s` will memory map in the contents of `"largefile.bin"`, then decode a stream of frames, where each frame is expected to begin with a number of bytes specified as a 32-bit signed int (the `int32` codec), followed by a frame payload of that many bytes. Nothing happens until the `s` stream is consumed, and `s` will ensure the `FileChannel` is closed in the event of an error or normal termination of the consumer. See [the guide](#guide) for further information and discussion of streaming encoding.
 
-Decoding speeds have been observed at 100 MB/s for some realistic examples ([decoding MPEG packets from a `.pcap` file](https://github.com/scodec/scodec-stream/blob/master/src/test/scala/scodec/stream/examples/Mpeg.scala)), though decoding speed will in general depend on how fine-grained the decoding is.
+Decoding speeds have been observed at 100 MB/s for some realistic examples ([decoding MPEG packets from a `.pcap` file](https://github.com/scodec/scodec-stream/blob/master/src/test/scala/scodec/stream/examples/Mpeg.scala)), though decoding speed will generally depend on how fine-grained the decoding is.
 
-#### Contents:
+__Links:__
 
-* [Where to get it](#where)
-* [Usage guide](#guide)
+* [Where to get it](#-where-to-get-it)
+* [Usage guide](#-guide)
 * [API docs](https://scodec.github.io/scodec-stream/api)
+* [Scodec mailing list](https://groups.google.com/forum/#!forum/scodec)
+* [scodec-protocols](https://github.com/scodec/scodec-protocols) has useful streaming encoders and decoders for various domains and is a nice place to look for examples of the library in use.
 
-### <a id="where"/> Where to get it
+### Where to get it
 
-### <a id="guide"/> Guide
+Add the following to your sbt build:
+
+```Scala
+libraryDependencies += "org.typelevel" %% "scodec-stream" % "1.0.0-SNAPSHOT"
+```
+
+There has not yet been an official (non-snapshot) scodec-stream release. Sign up for the [mailing list](https://groups.google.com/forum/#!forum/scodec) if you want to be notified of future releases.
+
+### Guide
+
