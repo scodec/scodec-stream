@@ -33,7 +33,7 @@ resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repos
 
 libraryDependencies ++= Seq(
   "org.typelevel" %% "scodec-core" % "1.0.0",
-  "org.scalaz.stream" %% "scalaz-stream" % "0.3.1",
+  "org.scalaz.stream" %% "scalaz-stream" % "0.4",
   "org.scalacheck" %% "scalacheck" % "1.11.3" % "test"
 )
 
