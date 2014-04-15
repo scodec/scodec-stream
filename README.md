@@ -25,9 +25,11 @@ __Links:__
 
 * [Where to get it](#where-to-get-it)
 * [Usage guide](#guide)
-* [API docs](https://scodec.github.io/scodec-stream/api)
+* [API docs][api]
 * [Scodec mailing list](https://groups.google.com/forum/#!forum/scodec)
 * [scodec-protocols](https://github.com/scodec/scodec-protocols) has useful streaming encoders and decoders for various domains and is a nice place to look for examples of the library in use.
+
+[api]: http://www.google.com/?q=scodec-stream+api
 
 ### Where to get it
 
@@ -61,14 +63,13 @@ The combinators for building `StreamDecoder` are fairly typical of what one migh
 * `decode.tryOnce`: A `scodec.Decoder[A] => StreamDecoder[A]` which promotes a regular (strict) decoder to a `StreamDecoder`. Unlike `decode.once`, decoding failures are not raised. Instead, the cursor position is left at its current location and the stream halts with no emitted elements.
 * `d1 or d2` (alternately `d1 | d2`): Runs `d1`, and if it emits no elements and raises no errors, runs `d2`. Example: `decode.tryOnce(codecs.variableSizeBytes(codecs.int32L, codecs.utf8)) | decode.emit("Joe Sixpack")` will try parsing UTF-8 encoded string, which begins with a length in bytes encoded as a little-endian encoded `Int`, followed by that many bytes for the string itself, and if this fails, will leave the cursor at its current location and emit the string `"Joe Sixpack"`.
 * `d.many`: Run `d` for as long as there is nonempty input, emitting the stream of decoded values. Example, `decode.once(codecs.int64).many` will parse a stream of 64-bit signed integers. This can also be written as `decode.many(codecs.int64)`.
-* * `d.isolate(numBits)` and `d.isolateBytes(numBytes)`: Useful when constructing nested decoders, runs `d` on the first `numBits` number of bits or `numBytes` number of bytes of the input, then advances the cursor by that many bits or bytes.
+* `d.isolate(numBits)` and `d.isolateBytes(numBytes)`: Useful when constructing nested decoders, runs `d` on the first `numBits` number of bits or `numBytes` number of bytes of the input, then advances the cursor by that many bits or bytes.
 * `d flatMap f`: Given a `d: StreamDecoder[A]` and an `f: A => StreamDecoder[B]`, produce a `StreamDecoder[B]` by running `d`, then using each resulting `A` to choose a `StreamDecoder[B]` to run to produce the output. For example, `decode.many(int32) flatMap { n => decode.once(codecs.fixedSizeBytes(n, codecs.utf8)) }` will be a `StreamDecoder[String]` which produces a stream of `String` outputs by repeatedly reading a signed 32-bit integer, `n`, then decoding a UTF-8 encoded string consisting of `n` bytes.
 * `d.peek`: Run `d: StreamDecoder[A]`, but after `d` completes, reset the cursor to its original, pre-`d` position.
 
 There are also various combinators for statefully transforming the output of a `StreamDecoder[A]`, or interleaving multiple decoders, namely `d pipe proc` (alternately `d |> proc`) and `(d1 tee d2)(f)`. See the [API docs][api] for more details.
 
 [dec-err]: https://github.com/scodec/scodec-stream/blob/master/src/main/scala/scodec/stream/decode/DecodingError.scala
-[api]: google.com
 
 #### Encoding
 
