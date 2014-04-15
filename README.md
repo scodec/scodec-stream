@@ -101,7 +101,7 @@ We are currently still discovering nice combinators for building up `StreamEncod
 * `e1 ++ e2`: Encode values with `e1` until it halts, then encode values with `e2` until it halts. Example: `encode.once(codecs.int32) ++ encode.many(codecs.int16)` encodes one `Int` as a 32-bit signed `Int`, followed by zero or more `Int` values encoded as 16-bit signed ints. (If an input does not fit in 16 bits, an [encoding error][enc-err] is raised within the `Process1`)
 * `e.mapBits(f)` where `f: BitVector => BitVector` and `e.pipeBits(p)`, where `p: Process1[BitVector,BitVector]`: Transform (possibly statefully) the bits output by this encoder. This can be used to accumulate and add framing, among other things. For instance, one might use `pipeBits` to wait for 1024kB to accumulate before emitting a frame consisting of a checksum of the current buffer, the number 1024 indicating the number of bytes in the frame, followed by a frame payload of that many bytes.
 
-[key combinators]: https://github.com/scodec/scodec-stream/blob/master/src/main/scala/scodec/stream/encode/package.scala
+[key]: https://github.com/scodec/scodec-stream/blob/master/src/main/scala/scodec/stream/encode/package.scala
 
 Since encoders only retain references to previously received values if they do so explicitly, it is easy to write streaming encoders to operate in constant memory.
 
