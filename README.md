@@ -13,7 +13,7 @@ val frames: StreamDecoder[ByteVector] = D.once(C.int32)
  .flatMap { numBytes => D.once(C.bytes(numBytes)).isolate(numBytes) }
  .many
 
-val s: Process[scalaz.concurrent.Task, ByteVector] = 
+val s: Process[scalaz.concurrent.Task, ByteVector] =
   frames.decodeMmap(new java.io.FileInputStream("largefile.bin").getChannel)
 ```
 
@@ -68,6 +68,17 @@ The combinators for building `StreamDecoder` are fairly typical of what one migh
 * `d.peek`: Run `d: StreamDecoder[A]`, but after `d` completes, reset the cursor to its original, pre-`d` position.
 
 There are also various combinators for statefully transforming the output of a `StreamDecoder[A]`, or interleaving multiple decoders, namely `d pipe proc` (alternately `d |> proc`) and `(d1 tee d2)(f)`. See the [API docs][api] for more details.
+
+##### Running decoders
+
+A decoder, `d: StreamDecoder[A]` may be run on an input `bits: BitVector` via `d.decode(bits)`, and there are various convenience functions, including `decodeInputStream`, `decodeMmap`, and `decodeChannel`, for safely decoding from a `java.io.InputStream`, a memory-mapped file, or `java.nio.ReadableByteChannel`. These convenience functions will allocate a lazy `BitVector` backed by the given source and ensure the input is closed when the consumer finishes consuming the decoded stream.
+
+Decoders are given the full input starting from the current cursor location - any chunking of the input `BitVector` is not visible to decoders, which simplifies their implementation as decoders need not worry about being given partial input. Thus, when promoting a `d: Decoder[A]` to a `StreamDecoder[A]` via `decode.once(d)`, `d` will be run on the full remainder of the current input. (Calling `decode.once(d).isolate(42)` will give `d` only the first 42 bits of the input, starting from the current cursor location, and will advance the cursor by 42 bits on completion.)
+
+When a `StreamDecoder[A]` advances the cursor, the head of the underlying `BitVector` may be garbage collected, making it easy to write decoders that operate in constant memory. There are a few caveats:
+
+* `d.peek` will retain the current cursor location in memory for as long as `d` takes to run, so it can reset this cursor location after `d` completes. Thus, it should be used only in restricted scopes, like `decode.once(codecs.int32).peek`, which reads a single `Int` and leaves it unconsumed. (Whereas `decode.many(int32).peek` will read an entire stream of `Int` values, and leave them unconsumed, requiring as much memory as is needed to represent all the integers in the stream)
+* `decode.ask: StreamDecoder[BitVector]` obtains the full input starting from the current cursor location. Obviously, stashing this `BitVector` somewhere may prevent the head of the `BitVector` from being garbage collected.
 
 [dec-err]: https://github.com/scodec/scodec-stream/blob/master/src/main/scala/scodec/stream/decode/DecodingError.scala
 
