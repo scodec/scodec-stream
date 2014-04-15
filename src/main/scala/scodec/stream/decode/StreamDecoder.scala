@@ -178,7 +178,7 @@ trait StreamDecoder[+A] {
    */
   def nonEmpty(messageIfEmpty: String): StreamDecoder[A] =
     pipe {
-      Process.await1[A].flatMap(process1.init(_)).orElse(
+      Process.await1[A].flatMap(process1.shiftRight(_)).orElse(
       Process.fail(DecodingError(messageIfEmpty)))
     }
 
