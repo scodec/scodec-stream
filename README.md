@@ -23,8 +23,8 @@ Decoding speeds have been observed at 100 MB/s for some realistic examples ([dec
 
 __Links:__
 
-* [Where to get it](#-where-to-get-it)
-* [Usage guide](#-guide)
+* [Where to get it](#where-to-get-it)
+* [Usage guide](#guide)
 * [API docs](https://scodec.github.io/scodec-stream/api)
 * [Scodec mailing list](https://groups.google.com/forum/#!forum/scodec)
 * [scodec-protocols](https://github.com/scodec/scodec-protocols) has useful streaming encoders and decoders for various domains and is a nice place to look for examples of the library in use.
