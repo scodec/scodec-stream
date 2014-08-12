@@ -107,7 +107,7 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
     implicit val chunkSize = Arbitrary(Gen.choose(32,64).map(Chunk(_)))
     forAll { (ints: List[Int], chunkSize: Chunk) =>
       val bits = E.once(int32).many.encodeAllValid(ints)
-      val chunks = Process.emitSeq(bits.grouped(chunkSize.get)).toSource
+      val chunks = Process.emitAll(bits.grouped(chunkSize.get)).toSource
       val d = D.process(int32)
       (chunks pipe d).runLog.run.toList == ints
     }
@@ -116,21 +116,20 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
   property("tryProcess") = {
     case class Chunk(get: Int)
     implicit val chunkSize = Arbitrary(Gen.choose(1,128).map(Chunk(_)))
-    object Suite extends Properties("fixed size") {
+    new Properties("fixed size") {
       property("strings") = forAll { (strings: List[String], chunkSize: Chunk) =>
         val bits = E.many(string).encodeAllValid(strings)
-        val chunks = Process.emitSeq(bits.grouped(chunkSize.get)).toSource
+        val chunks = Process.emitAll(bits.grouped(chunkSize.get)).toSource
         val d = D.tryProcess(Long.MaxValue)(string)
         (chunks pipe d).runLog.run.toList == strings
       }
       property("ints") = forAll { (ints: List[Int], chunkSize: Chunk) =>
         val bits = E.many(int32).encodeAllValid(ints)
-        val chunks = Process.emitSeq(bits.grouped(chunkSize.get)).toSource
+        val chunks = Process.emitAll(bits.grouped(chunkSize.get)).toSource
         val d = D.tryProcess(32)(int32)
         (chunks pipe d).runLog.run.toList == ints
       }
     }
-    Suite
   }
 }
 

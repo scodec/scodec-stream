@@ -6,7 +6,6 @@ import scodec.bits._
 import scodec._
 import scodec.stream._
 import scodec.stream.decode.DecodingError
-import shapeless.Iso
 
 import scalaz.std.AllInstances._
 import scalaz.std.indexedSeq._
@@ -30,7 +29,7 @@ object Mpeg extends App {
       // Drop 22 byte ethernet frame header and 20 byte IPv4/udp header
       val datagramPayloadBits = record.data.drop(22 * 8).drop(20 * 8)
       val packets = codecs.repeated(Codec[MpegPacket]).decodeValue(datagramPayloadBits)
-      Process.emitSeq(packets.getOrElse(Seq.empty))
+      Process.emitAll(packets.getOrElse(Seq.empty))
     }
 
     mpegPcapDecoder
@@ -91,7 +90,6 @@ object PcapCodec {
   def guint32(implicit ordering: ByteOrdering): Codec[Long] = if (ordering == BigEndian) uint32 else uint32L
 
   case class PcapHeader(ordering: ByteOrdering, versionMajor: Int, versionMinor: Int, thiszone: Int, sigfigs: Long, snaplen: Long, network: Long)
-  implicit val pcapHeaderIso = Iso.hlist(PcapHeader.apply _, PcapHeader.unapply _)
 
   implicit val pcapHeader: Codec[PcapHeader] = {
     ("magic_number"     | byteOrdering             ) >>:~ { implicit ordering =>
@@ -107,7 +105,6 @@ object PcapCodec {
   case class PcapRecordHeader(timestampSeconds: Long, timestampMicros: Long, includedLength: Long, originalLength: Long) {
     def timestamp: Double = timestampSeconds + (timestampMicros / (1.second.toMicros.toDouble))
   }
-  implicit val pcapRecordHeaderIso = Iso.hlist(PcapRecordHeader.apply _, PcapRecordHeader.unapply _)
 
   implicit def pcapRecordHeader(implicit ordering: ByteOrdering) = {
     ("ts_sec"           | guint32                  ) ::
@@ -117,7 +114,6 @@ object PcapCodec {
   }.as[PcapRecordHeader]
 
   case class PcapRecord(header: PcapRecordHeader, data: BitVector)
-  implicit val pcapRecordIso = Iso.hlist(PcapRecord.apply _, PcapRecord.unapply _)
 
   implicit def pcapRecord(implicit ordering: ByteOrdering) = {
     ("record_header"    | pcapRecordHeader                   ) >>:~ { hdr =>
@@ -125,7 +121,6 @@ object PcapCodec {
   }}.as[PcapRecord]
 
   case class PcapFile(header: PcapHeader, records: IndexedSeq[PcapRecord])
-  implicit val pcapFileIso = Iso.hlist(PcapFile.apply _, PcapFile.unapply _)
 
   implicit val pcapFile = {
     pcapHeader >>:~ { hdr => repeated(pcapRecord(hdr.ordering)).hlist
@@ -149,7 +144,6 @@ object MpegCodecs {
     def adaptationFieldIncluded: Boolean = adaptationFieldControl >= 2
     def payloadIncluded: Boolean = adaptationFieldControl == 1 || adaptationFieldControl == 3
   }
-  implicit def tsHeaderIso = Iso.hlist(TransportStreamHeader.apply _, TransportStreamHeader.unapply _)
 
   case class AdaptationFieldFlags(
     discontinuity: Boolean,
@@ -160,7 +154,6 @@ object MpegCodecs {
     splicingPointFlag: Boolean,
     transportPrivateDataFlag: Boolean,
     adaptationFieldExtension: Boolean)
-  implicit def mpegAdaptationFieldFlagsIso = Iso.hlist(AdaptationFieldFlags.apply _, AdaptationFieldFlags.unapply _)
 
   case class AdaptationField(
     flags: AdaptationFieldFlags,
@@ -168,14 +161,12 @@ object MpegCodecs {
     opcr: Option[BitVector],
     spliceCountdown: Option[Int]
   )
-  implicit def mpegAdaptationFieldIso = Iso.hlist(AdaptationField.apply _, AdaptationField.unapply _)
 
   case class MpegPacket(
     header: TransportStreamHeader,
     adaptationField: Option[AdaptationField],
     payload: Option[ByteVector]
   )
-  implicit def mpegPacketIso = Iso.hlist(MpegPacket.apply _, MpegPacket.unapply _)
 
   implicit val transportStreamHeader: Codec[TransportStreamHeader] = {
     ("syncByte"                  | constant(0x47)          ) :~>:

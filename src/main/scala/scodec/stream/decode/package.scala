@@ -132,7 +132,7 @@ package object decode {
       P.await1[BitVector] flatMap { bits =>
         consume(A)(leftover ++ bits, Vector.empty) match {
           case (rem, Vector(), lastError) => P.fail(DecodingError(lastError))
-          case (rem, out, _) => P.emitSeq(out) ++ waiting(rem)
+          case (rem, out, _) => P.emitAll(out) ++ waiting(rem)
         }
       }
     waiting(BitVector.empty)
@@ -158,7 +158,7 @@ package object decode {
         val buf = leftover ++ bits
         consume(A)(buf, Vector.empty) match {
           case (rem, Vector(), lastError) if buf.size > attemptBits => P.fail(DecodingError(lastError))
-          case (rem, out, _) => P.emitSeq(out) ++ waiting(rem)
+          case (rem, out, _) => P.emitAll(out) ++ waiting(rem)
         }
       }
     waiting(BitVector.empty)
@@ -181,7 +181,20 @@ package object decode {
    * should be handled by `p1`.
    */
   def or[A](p1: StreamDecoder[A], p2: StreamDecoder[A]) =
-    p1.tee(p2)((P.awaitL[A].repeat: Tee[A,A,A]) orElse P.awaitR[A].repeat)
+    p1.edit { p1 => orImpl(p1, p2.decoder) }
+
+  // generic combinator, this could be added to scalaz-stream
+  private def orImpl[F[_],A](p: Process[F,A], p2: Process[F,A]): Process[F,A] = {
+    // emit a single `None` if `p` is empty, otherwise wrap outputs in `Some`
+    val terminated = p |> process1.awaitOption[A].flatMap {
+      case None => P.emit(None)
+      case Some(a) => process1.shiftRight(a).map(Some(_))
+    }
+    terminated.flatMap {
+      case None => p2 // if there's a `None`, `p` must have been empty, switch to `p2`
+      case Some(a) => P.emit(a) // if there's a `Some`, `p` nonempty, so ignore `p2`
+    }
+  }
 
   /**
    * Run this decoder, but leave its input unconsumed. Note that this
