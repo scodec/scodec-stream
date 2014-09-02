@@ -37,13 +37,19 @@ __Links:__
 
 ### Where to get it
 
-Add the following to your sbt build:
+The latest stable build is 0.1.0. Note: There are no source or binary compatibility guarantees offered at this point.
 
 ```Scala
-libraryDependencies += "org.typelevel" %% "scodec-stream" % "1.0.0-SNAPSHOT"
+libraryDependencies += "org.typelevel" %% "scodec-stream" % "0.1.0"
 ```
 
-There has not yet been an official (non-snapshot) scodec-stream release. Sign up for the [mailing list](https://groups.google.com/forum/#!forum/scodec) if you want to be notified of future releases.
+The latest development version is available as:
+
+```Scala
+libraryDependencies += "org.typelevel" %% "scodec-stream" % "0.2.0-SNAPSHOT"
+```
+
+Sign up for the [mailing list](https://groups.google.com/forum/#!forum/scodec) if you want to be notified of future releases.
 
 ### Guide
 
