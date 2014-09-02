@@ -175,6 +175,31 @@ package object decode {
     }
 
   /**
+   * Like [[scodec.stream.decode.tryMany]], but reads up to `chunkSize` elements
+   * at once. As mentioned in [[scodec.stream.decode.manyChunks]], the resulting
+   * decoder cannot be meaningfully interleaved with other decoders.
+   */
+  def tryManyChunked[A](chunkSize: Int)(implicit A: Decoder[A]): StreamDecoder[A] =
+    if (chunkSize < 1) throw new IllegalArgumentException("chunk size must be positive: " + chunkSize)
+    else ask.map(Box(_)) flatMap { box =>
+      var cur = box.get; box.clear()
+      val buf = new collection.mutable.ArrayBuffer[A]
+      try {
+        while (cur.nonEmpty && buf.size < chunkSize) {
+          A.decode(cur).fold(
+            msg => throw new DecodingError(msg),
+            { case (rem,a) => cur = rem; buf += a }
+          )
+        }
+        set(cur) ++ {
+          if (buf.nonEmpty) StreamDecoder.instance { P.emitAll(buf) } ++ manyChunked(chunkSize)
+          else halt
+        }
+      }
+      catch { case e: DecodingError => halt }
+    }
+
+  /**
    * Runs `p1`, then runs `p2` if `p1` emits no elements.
    * Example: `or(tryOnce(codecs.int32), once(codecs.uint32))`.
    * This function does no backtracking of its own; backtracking

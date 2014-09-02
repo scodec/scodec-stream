@@ -20,7 +20,8 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
       bits == bits2 &&
       D.once(int32).many.decodeAllValid(bits).toList == ints &&
       D.tryMany(int32).decodeAllValid(bits2).toList == ints &&
-      D.manyChunked(n.toInt)(int32).decodeAllValid(bits2).toList == ints
+      D.manyChunked(n.toInt)(int32).decodeAllValid(bits2).toList == ints &&
+      D.tryManyChunked(n.toInt)(int32).decodeAllValid(bits2).toList == ints
     }
   }
 
