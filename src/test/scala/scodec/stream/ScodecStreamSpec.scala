@@ -11,12 +11,17 @@ import scodec.stream.{decode => D, encode => E}
 
 object ScodecStreamSpec extends Properties("scodec.stream") {
 
-  property("many/tryMany") = forAll { (ints: List[Int]) =>
-    val bits = repeated(int32).encodeValid(ints.toIndexedSeq)
-    val bits2 = E.many(int32).encodeAllValid(ints)
-    bits == bits2 &&
-    D.once(int32).many.decodeAllValid(bits).toList == ints &&
-    D.tryMany(int32).decodeAllValid(bits2).toList == ints
+  property("many/tryMany") = {
+    implicit val arbLong = Arbitrary(Gen.choose(1L,500L)) // chunk sizes
+
+    forAll { (ints: List[Int], n: Long) =>
+      val bits = repeated(int32).encodeValid(ints.toIndexedSeq)
+      val bits2 = E.many(int32).encodeAllValid(ints)
+      bits == bits2 &&
+      D.once(int32).many.decodeAllValid(bits).toList == ints &&
+      D.tryMany(int32).decodeAllValid(bits2).toList == ints &&
+      D.manyChunked(n.toInt)(int32).decodeAllValid(bits2).toList == ints
+    }
   }
 
   property("tryMany-example") = secure {
@@ -77,7 +82,7 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
   property("sepBy") = forAll { (ints: List[Int], delim: String) =>
     val e = E.once(int32) ++ E.many(int32).mapBits(string.encodeValid(delim) ++ _)
     val encoded = e.encodeAllValid(ints)
-    D.many(int32).sepBy(string).decodeAllValid(encoded).toList == ints
+    D.many(int32).sepBy(string).decodeAllValid(encoded).toList ?= ints
   }
 
   property("decodeResource") = forAll { (strings: List[String]) =>

@@ -205,6 +205,29 @@ package object decode {
     ask flatMap { saved => d ++ set(saved) }
 
   /**
+   * Like `many`, but reads up to `chunkSize` elements from the stream at a time,
+   * to minimize overhead. Since this "reads ahead" in the stream, it can't be
+   * used predictably when the returned decoder will be interleaved with another
+   * decoder, as in `sepBy`, or any other combinator that uses `tee`.
+   */
+  def manyChunked[A](chunkSize: Int)(implicit A: Decoder[A]): StreamDecoder[A] =
+    if (chunkSize < 1) throw new IllegalArgumentException("chunk size must be positive: " + chunkSize)
+    else ask.map(Box(_)) flatMap { box =>
+      var cur = box.get; box.clear()
+      val buf = new collection.mutable.ArrayBuffer[A]
+      while (cur.nonEmpty && buf.size < chunkSize) {
+        A.decode(cur).fold(
+          msg => throw new DecodingError(msg),
+          { case (rem,a) => cur = rem; buf += a }
+        )
+      }
+      set(cur) ++ {
+        if (buf.nonEmpty) StreamDecoder.instance { P.emitAll(buf) } ++ manyChunked(chunkSize)
+        else halt
+      }
+    }
+
+  /**
    * Parse a stream of `A` values from the input, using the given decoder.
    * The returned stream terminates normally if the final value decoded
    * exhausts `in` and leaves no trailing bits. The returned stream terminates
