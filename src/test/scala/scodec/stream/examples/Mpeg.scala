@@ -1,6 +1,5 @@
 package scodec.stream.examples
 
-import scala.collection.immutable.IndexedSeq
 import scala.concurrent.duration._
 import scodec.bits._
 import scodec._
@@ -8,7 +7,6 @@ import scodec.stream._
 import scodec.stream.decode.DecodingError
 
 import scalaz.std.AllInstances._
-import scalaz.std.indexedSeq._
 import scalaz.syntax.id._
 import scalaz.stream.Process
 import scalaz.concurrent.Task
@@ -28,7 +26,7 @@ object Mpeg extends App {
     val mpegPcapDecoder: StreamDecoder[MpegPacket] = pcapRecordStreamDecoder flatMapP { record =>
       // Drop 22 byte ethernet frame header and 20 byte IPv4/udp header
       val datagramPayloadBits = record.data.drop(22 * 8).drop(20 * 8)
-      val packets = codecs.repeated(Codec[MpegPacket]).decodeValue(datagramPayloadBits)
+      val packets = codecs.vector(Codec[MpegPacket]).decodeValue(datagramPayloadBits)
       Process.emitAll(packets.getOrElse(Seq.empty))
     }
 
@@ -120,10 +118,10 @@ object PcapCodec {
     ("record_data"      | bits(hdr.includedLength.toInt * 8) ).hlist
   }}.as[PcapRecord]
 
-  case class PcapFile(header: PcapHeader, records: IndexedSeq[PcapRecord])
+  case class PcapFile(header: PcapHeader, records: Vector[PcapRecord])
 
   implicit val pcapFile = {
-    pcapHeader >>:~ { hdr => repeated(pcapRecord(hdr.ordering)).hlist
+    pcapHeader >>:~ { hdr => vector(pcapRecord(hdr.ordering)).hlist
   }}.as[PcapFile]
 }
 

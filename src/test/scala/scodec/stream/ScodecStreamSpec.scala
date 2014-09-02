@@ -12,7 +12,7 @@ import scodec.stream.{decode => D, encode => E}
 object ScodecStreamSpec extends Properties("scodec.stream") {
 
   property("many/tryMany") = forAll { (ints: List[Int]) =>
-    val bits = repeated(int32).encodeValid(ints.toIndexedSeq)
+    val bits = vector(int32).encodeValid(ints.toVector)
     val bits2 = E.many(int32).encodeAllValid(ints)
     bits == bits2 &&
     D.once(int32).many.decodeAllValid(bits).toList == ints &&
@@ -44,7 +44,7 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
   }
 
   property("isolate") = forAll { (ints: List[Int]) =>
-    val bits = repeated(int32).encodeValid(ints.toIndexedSeq)
+    val bits = vector(int32).encodeValid(ints.toVector)
     val p =
       D.many(int32).isolate(bits.size).map(_ => 0) ++
       D.many(int32).isolate(bits.size).map(_ => 1)
