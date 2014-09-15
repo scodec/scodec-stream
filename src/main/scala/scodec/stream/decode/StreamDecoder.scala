@@ -235,6 +235,9 @@ trait StreamDecoder[+A] {
   def filter(f: A => Boolean): StreamDecoder[A] =
     edit { _ filter f }
 
+  /** Skip any decoded values for which the predicate tests false. */
+  def withFilter(f: A => Boolean): StreamDecoder[A] = filter(f)
+
   /**
    * Equivalent to `dropWhile(f).take(1)` - returns a stream of (at most)
    * one element, consisting of the first output for which `f` tests false.
