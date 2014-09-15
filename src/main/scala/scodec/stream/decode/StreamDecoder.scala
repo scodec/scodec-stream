@@ -39,15 +39,11 @@ trait StreamDecoder[+A] {
    */
   final def decode(bits: => BitVector): Process[Task,A] = Process.suspend {
     @volatile var cur = bits // am pretty sure this doesn't need to be volatile, but just being safe
-    def set(bs: BitVector): Task[BitVector] = Task.delay {
-      cur = bs
-      cur
-    }
     decoder.translate(new (Cursor ~> Task) {
       def apply[A](c: Cursor[A]): Task[A] = Task.suspend {
         c.run(cur).fold(
           msg => Task.fail(DecodingError(msg)),
-          { case (rem,a) => set(rem).flatMap { _ => Task.now(a) }}
+          { case (rem,a) => Task.now { cur = rem; a } }
         )
       }
     })
