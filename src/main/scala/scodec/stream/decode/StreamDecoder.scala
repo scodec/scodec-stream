@@ -162,6 +162,12 @@ trait StreamDecoder[+A] {
     edit { _ map f }
 
   /**
+   * Transform the output of this `StreamDecoder` using the partial function `pf`.
+   */
+  final def collect[B](pf: PartialFunction[A, B]): StreamDecoder[B] =
+    edit { _ collect pf }
+
+  /**
    * Transform the output of this `StreamDecoder`, converting left values
    * to decoding failures.
    */
