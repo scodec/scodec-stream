@@ -168,7 +168,7 @@ object MpegCodecs {
 
   implicit val transportStreamHeader: Codec[TransportStreamHeader] = {
     ("syncByte"                  | constant(0x47)          ) :~>:
-    ("transportStringIndicator"   | bool                    ) ::
+    ("transportStringIndicator"  | bool                    ) ::
     ("payloadUnitStartIndicator" | bool                    ) ::
     ("transportPriority"         | bool                    ) ::
     ("pid"                       | uint(13)                ) ::
