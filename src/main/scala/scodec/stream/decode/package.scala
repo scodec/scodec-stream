@@ -291,7 +291,6 @@ package object decode {
       def decode(bits: BitVector) = Decoder.decodeBoth(A,B)(bits)
     }
   }
-
 }
 
 // mutable reference that we can null out for GC purposes
