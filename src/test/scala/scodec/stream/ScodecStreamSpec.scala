@@ -137,5 +137,12 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
       }
     }
   }
+
+  property("toLazyBitVector") = {
+    forAll { (ints: List[Int]) =>
+      val bvs = ints.map { i => int32.encodeValid(i) }
+      toLazyBitVector(Process.emitAll(bvs)) == bvs.foldLeft(BitVector.empty) { _ ++ _ }
+    }
+  }
 }
 
