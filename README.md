@@ -37,16 +37,16 @@ __Links:__
 
 ### Where to get it
 
-The latest stable build is 0.1.0. Note: There are no source or binary compatibility guarantees offered at this point.
+The latest stable build is 0.2.0. Note: There are no source or binary compatibility guarantees offered at this point.
 
 ```Scala
-libraryDependencies += "org.typelevel" %% "scodec-stream" % "0.1.0"
+libraryDependencies += "org.typelevel" %% "scodec-stream" % "0.2.0"
 ```
 
 The latest development version is available as:
 
 ```Scala
-libraryDependencies += "org.typelevel" %% "scodec-stream" % "0.2.0-SNAPSHOT"
+libraryDependencies += "org.typelevel" %% "scodec-stream" % "0.3.0-SNAPSHOT"
 ```
 
 Sign up for the [mailing list](https://groups.google.com/forum/#!forum/scodec) if you want to be notified of future releases.
