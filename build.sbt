@@ -30,6 +30,8 @@ triggeredMessage := (_ => Watched.clearScreen)
 
 resolvers += "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"
 
+resolvers += "Sonatype Public" at "https://oss.sonatype.org/content/groups/public/"
+
 libraryDependencies ++= Seq(
   "org.typelevel" %% "scodec-core" % "1.3.1",
   "org.scalaz.stream" %% "scalaz-stream" % "0.5a",
