@@ -21,9 +21,9 @@ package object decode {
   def fail(err: Throwable): StreamDecoder[Nothing] =
     StreamDecoder.instance { P.fail(err) }
 
-  /** The decoder that consumes no input and halts with the given error message. */
-  def fail(msg: String): StreamDecoder[Nothing] =
-    StreamDecoder.instance { P.fail(DecodingError(msg)) }
+  /** The decoder that consumes no input and halts with the given error. */
+  def fail(err: Err): StreamDecoder[Nothing] =
+    StreamDecoder.instance { P.fail(DecodingError(err)) }
 
   /** The decoder that consumes no input, emits the given `a`, then halts. */
   def emit[A](a: A): StreamDecoder[A] =
@@ -106,7 +106,7 @@ package object decode {
 
   @annotation.tailrec
   private def consume[A](A: Decoder[A])(bits: BitVector, acc: Vector[A]):
-      (BitVector, Vector[A], String) =
+      (BitVector, Vector[A], Err) =
     A.decode(bits) match {
       case -\/(err) => (bits, acc, err)
       case \/-((rem,a)) => consume(A)(rem, acc :+ a)
@@ -267,7 +267,7 @@ package object decode {
    * element if it succeeds.
    */
   def many1[A:Decoder]: StreamDecoder[A] =
-    many[A].nonEmpty("many1 produced no outputs")
+    many[A].nonEmpty(Err("many1 produced no outputs"))
 
   /**
    * Like `many`, but parses and ignores a `D` delimiter value in between
@@ -284,7 +284,7 @@ package object decode {
    * element if it succeeds.
    */
   def sepBy1[A:Decoder,D:Decoder]: StreamDecoder[A] =
-    sepBy[A,D].nonEmpty("sepBy1 given empty input")
+    sepBy[A,D].nonEmpty(Err("sepBy1 given empty input"))
 
   private implicit class DecoderSyntax[A](A: Decoder[A]) {
     def ~[B](B: Decoder[B]): Decoder[(A,B)] = new Decoder[(A,B)] {

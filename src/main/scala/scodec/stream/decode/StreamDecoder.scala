@@ -5,7 +5,7 @@ import java.nio.channels.{FileChannel, ReadableByteChannel}
 import scalaz.{~>,\/,MonadPlus}
 import scalaz.stream.{Process,Process1,process1,Tee}
 import scalaz.concurrent.Task
-import scodec.Decoder
+import scodec.{ Decoder, Err }
 import scodec.bits.BitVector
 
 /**
@@ -153,7 +153,7 @@ trait StreamDecoder[+A] {
    * Run this `StreamDecoder` one or more times until the input is exhausted.
    */
   def many1: StreamDecoder[A] =
-    this.many.nonEmpty("many1 produced no outputs")
+    this.many.nonEmpty(Err("many1 produced no outputs"))
 
   /**
    * Transform the output of this `StreamDecoder` using the function `f`.
@@ -171,17 +171,17 @@ trait StreamDecoder[+A] {
    * Transform the output of this `StreamDecoder`, converting left values
    * to decoding failures.
    */
-  final def mapEither[B](f: A => String \/ B): StreamDecoder[B] =
+  final def mapEither[B](f: A => Err \/ B): StreamDecoder[B] =
     this.flatMap { a => f(a).fold(D.fail, D.emit) }
 
   /**
    * Raises a decoding error if the given decoder emits no results,
    * otherwise runs `p` as normal.
    */
-  def nonEmpty(messageIfEmpty: String): StreamDecoder[A] =
+  def nonEmpty(errIfEmpty: Err): StreamDecoder[A] =
     pipe {
       Process.receive1Or[A, A](
-        Process.fail(DecodingError(messageIfEmpty))
+        Process.fail(DecodingError(errIfEmpty))
       )(Process.emit).flatMap(process1.shiftRight(_))
     }
 

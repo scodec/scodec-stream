@@ -1,6 +1,6 @@
 package scodec.stream
 
-import scodec.Encoder
+import scodec.{ Encoder, Err }
 import scodec.bits.BitVector
 import scalaz.stream.{Process => P}
 
@@ -11,8 +11,8 @@ package object encode {
     StreamEncoder.instance { P.fail(err) }
 
   /** The encoder that consumes no input and halts with the given error message. */
-  def fail(msg: String): StreamEncoder[Nothing] =
-    StreamEncoder.instance { P.fail(EncodingError(msg)) }
+  def fail(err: Err): StreamEncoder[Nothing] =
+    StreamEncoder.instance { P.fail(EncodingError(err)) }
 
   /** The encoder that consumes no input and emits no values. */
   val halt: StreamEncoder[Nothing] =

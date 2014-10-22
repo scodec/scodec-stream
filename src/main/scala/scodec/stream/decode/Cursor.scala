@@ -5,9 +5,10 @@ import scalaz.stream.{Process => P}
 import scalaz.concurrent.Task
 import scalaz.{\/,Catchable,Monad,MonadPlus}
 import scalaz.\/.{left,right}
+import scodec.Err
 import scodec.bits.BitVector
 
-case class Cursor[+A](run: BitVector => String \/ (BitVector,A))
+case class Cursor[+A](run: BitVector => Err \/ (BitVector,A))
 
 object Cursor {
   def ask: Cursor[BitVector] = Cursor { bits => right(bits -> bits) }

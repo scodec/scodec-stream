@@ -1,3 +1,5 @@
-package scodec.stream.decode
+package scodec
+package stream
+package decode
 
-case class DecodingError(message: String) extends Exception(message)
+case class DecodingError(err: Err) extends Exception(err.toString)

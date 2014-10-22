@@ -5,7 +5,7 @@ import Prop._
 import scalaz.\/._
 import scalaz.stream.Process
 import scodec.bits.BitVector
-import scodec.Decoder
+import scodec.{ Decoder, Err }
 import scodec.codecs._
 import scodec.stream.{decode => D, encode => E}
 
@@ -43,7 +43,7 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
     val bits = E.many(int32).encodeAllValid(Vector(1,2,3))
     var cleanedUp = false
     val dec: StreamDecoder[Int] = D.many1(int32)
-      .flatMap { _ => D.fail("oh noes!") }
+      .flatMap { _ => D.fail(Err("oh noes!")) }
       .onComplete { D.suspend { cleanedUp = true; D.halt }}
     cleanedUp == false &&
     dec.decode(bits).run.attemptRun.isLeft
@@ -64,10 +64,10 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
     val p2 = D.halt.or(D.many(int32))
     val p3 = D.once(int32).many | D.once(int32).many
     val p4 = p3 or p1
-    def fail(msg: String): Decoder[Nothing] = new Decoder[Nothing] {
-      def decode(bits: BitVector) = left(msg)
+    def fail(err: Err): Decoder[Nothing] = new Decoder[Nothing] {
+      def decode(bits: BitVector) = left(err)
     }
-    val failing = D.tryOnce(uint8.flatMap { _ => fail("!!!") })
+    val failing = D.tryOnce(uint8.flatMap { _ => fail(Err("!!!")) })
     // NB: this fails as expected - since `once` does not backtrack
     // val failing = once(uint8.flatMap { _ => fail("!!!") })
     val p5 = failing or p1
