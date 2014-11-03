@@ -33,7 +33,7 @@ resolvers += "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"
 resolvers += "Sonatype Public" at "https://oss.sonatype.org/content/groups/public/"
 
 libraryDependencies ++= Seq(
-  "org.typelevel" %% "scodec-core" % "1.4.0",
+  "org.typelevel" %% "scodec-core" % "1.5.0-SNAPSHOT",
   "org.scalaz.stream" %% "scalaz-stream" % "0.5a",
   "org.scalacheck" %% "scalacheck" % "1.11.3" % "test"
 )
