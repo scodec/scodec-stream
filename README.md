@@ -1,7 +1,6 @@
 scodec-stream
 =============
 
-
 Scodec-stream is a library for streaming binary encoding and decoding. It is built atop [scodec](https://github.com/scodec/scodec) and [scalaz-stream][]. Here's a brief example of its use:
 
 ```Scala
@@ -25,6 +24,7 @@ Decoding speeds have been observed at 100 MB/s for some realistic examples ([dec
 
 __Links:__
 
+* [Administrative](#admin)
 * [Where to get it](#where-to-get-it)
 * [Usage guide](#guide)
     * [Decoding](#decoding)
@@ -34,6 +34,19 @@ __Links:__
 * [scodec-protocols](https://github.com/scodec/scodec-protocols) has useful streaming encoders and decoders for various domains and is a nice place to look for examples of the library in use.
 
 [api]: http://www.google.com/?q=scodec-stream+api
+
+### Administrative
+
+This project is licensed under a [3-clause BSD license](LICENSE).
+
+The [scodec mailing list](https://groups.google.com/forum/#!forum/scodec) contains release announcements and is generally a good place to go for help. Also consider using the [scodec tag on StackOverflow](http://stackoverflow.com/questions/tagged/scodec).
+
+People are expected to follow the [Typelevel Code of Conduct](http://typelevel.org/conduct.html)
+when discussing scodec on the Github page, IRC channel, mailing list,
+or other venues.
+
+Concerns or issues can be sent to Michael Pilquist (*mpilquist@gmail.com*) or
+to [Typelevel](http://typelevel.org/about.html).
 
 ### Where to get it
 
