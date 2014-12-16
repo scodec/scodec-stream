@@ -114,9 +114,9 @@ package object decode {
 
   /**
    * Promote a decoder to a `Process1`. The returned `Process1` may be
-   * given chunks larger than what is needed to decode a single element,
-   * and will buffer any leftover input, but a decoding error will result
-   * if the buffer size is ever less than what is needed to decode an `A`.
+   * given chunks larger or smaller than what is needed to decode a single
+   * element, and will buffer any unconsumed input, but a decoding error
+   * will result if the decoder fails for a reason other than `Err.InsufficientBits`.
    *
    * This combinator relies on the decoder satisfying the following
    * property: If successful on input `x`, `A` should also succeed with the
@@ -131,33 +131,8 @@ package object decode {
     def waiting(leftover: BitVector): Process1[BitVector,A] =
       P.await1[BitVector] flatMap { bits =>
         consume(A)(leftover ++ bits, Vector.empty) match {
+          case (rem, out, err: Err.InsufficientBits) => P.emitAll(out) ++ waiting(rem)
           case (rem, Vector(), lastError) => P.fail(DecodingError(lastError))
-          case (rem, out, _) => P.emitAll(out) ++ waiting(rem)
-        }
-      }
-    waiting(BitVector.empty)
-  }
-
-  /**
-   * Like [[scodec.stream.decode.process]], but the returned process may be
-   * given chunks larger OR smaller than what is needed to decode a single element.
-   * After the buffer size has grown beyond `attemptBits`, decoding failures
-   * are raised rather than being treated as an indication that more input is needed.
-   * Without this argument, a failing decoder due to malformed input would eventually
-   * buffer the entire input before halting.
-   *
-   * In addition to the monotonicity requirement given in [[scodec.stream.decode.process]],
-   * we require also that if `A` fails on `x ++ y`, it must also fail for `x`, for
-   * any choices of `x` and `y`. This ensures that we can feed the decoder less
-   * than its expected input, and interpret failure as an indication that more input
-   * is needed.
-   */
-  def tryProcess[A](attemptBits: Long)(implicit A: Decoder[A]): Process1[BitVector,A] = {
-    def waiting(leftover: BitVector): Process1[BitVector,A] =
-      P.await1[BitVector] flatMap { bits =>
-        val buf = leftover ++ bits
-        consume(A)(buf, Vector.empty) match {
-          case (rem, Vector(), lastError) if buf.size > attemptBits => P.fail(DecodingError(lastError))
           case (rem, out, _) => P.emitAll(out) ++ waiting(rem)
         }
       }
