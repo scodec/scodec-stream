@@ -7,6 +7,8 @@ import scalaz.concurrent.Task
 import scalaz.{\/,-\/,\/-,~>,Monad,MonadPlus}
 import scodec.bits.BitVector
 
+import shapeless.Lazy
+
 /**
  * Module containing various streaming decoding combinators.
  * Decoding errors are represented using [[scodec.stream.decode.DecodingError]].
@@ -82,14 +84,14 @@ package object decode {
     isolate(numberOfBits = numberOfBytes * 8)(d)
 
   /** Run the given `Decoder[A]` on `in`, returning its result as a `StreamDecoder`. */
-  private[decode] def runDecode[A](in: BitVector)(implicit A: Decoder[A]): StreamDecoder[A] =
-    A.decode(in).fold(
+  private[decode] def runDecode[A](in: BitVector)(implicit A: Lazy[Decoder[A]]): StreamDecoder[A] =
+    A.value.decode(in).fold(
       fail,
       { case (rem,a) => set(rem) ++ emit(a) }
     )
 
   /** Run the given `Decoder` once and emit its result, if successful. */
-  def once[A](implicit A: Decoder[A]): StreamDecoder[A] =
+  def once[A](implicit A: Lazy[Decoder[A]]): StreamDecoder[A] =
     ask flatMap { runDecode[A] }
 
   /**
@@ -97,8 +99,8 @@ package object decode {
    * input unconsumed in the event of a decoding error. `tryOnce[A].repeat`
    * will produce the same result as `many[A]`, but allows.
    */
-  def tryOnce[A](implicit A: Decoder[A]): StreamDecoder[A] = ask flatMap { in =>
-    A.decode(in).fold(
+  def tryOnce[A](implicit A: Lazy[Decoder[A]]): StreamDecoder[A] = ask flatMap { in =>
+    A.value.decode(in).fold(
       _ => halt,
       { case (rem,a) => set(rem) ++ emit(a) }
     )
@@ -127,10 +129,10 @@ package object decode {
    * satisfying this property will make results highly dependent on the sequence
    * of chunk sizes passed to the process.
    */
-  def process[A](implicit A: Decoder[A]): Process1[BitVector,A] = {
+  def process[A](implicit A: Lazy[Decoder[A]]): Process1[BitVector,A] = {
     def waiting(leftover: BitVector): Process1[BitVector,A] =
       P.await1[BitVector] flatMap { bits =>
-        consume(A)(leftover ++ bits, Vector.empty) match {
+        consume(A.value)(leftover ++ bits, Vector.empty) match {
           case (rem, out, err: Err.InsufficientBits) => P.emitAll(out) ++ waiting(rem)
           case (rem, Vector(), lastError) => P.fail(DecodingError(lastError))
           case (rem, out, _) => P.emitAll(out) ++ waiting(rem)
@@ -143,7 +145,7 @@ package object decode {
    * Like [[scodec.stream.decode.many]], but in the event of a decoding error,
    * resets cursor to end of last successful decode, then halts normally.
    */
-  def tryMany[A](implicit A: Decoder[A]): StreamDecoder[A] =
+  def tryMany[A](implicit A: Lazy[Decoder[A]]): StreamDecoder[A] =
     tryOnce(A).map(Some(_)).or(emit(None)).flatMap {
       case None => halt
       case Some(a) => emit(a) ++ tryMany[A]
@@ -154,14 +156,14 @@ package object decode {
    * at once. As mentioned in [[scodec.stream.decode.manyChunks]], the resulting
    * decoder cannot be meaningfully interleaved with other decoders.
    */
-  def tryManyChunked[A](chunkSize: Int)(implicit A: Decoder[A]): StreamDecoder[A] =
+  def tryManyChunked[A](chunkSize: Int)(implicit A: Lazy[Decoder[A]]): StreamDecoder[A] =
     if (chunkSize < 1) throw new IllegalArgumentException("chunk size must be positive: " + chunkSize)
     else ask.map(Box(_)) flatMap { box =>
       var cur = box.get; box.clear()
       val buf = new collection.mutable.ArrayBuffer[A]
       try {
         while (cur.nonEmpty && buf.size < chunkSize) {
-          A.decode(cur).fold(
+          A.value.decode(cur).fold(
             msg => throw new DecodingError(msg),
             { case (rem,a) => cur = rem; buf += a }
           )
@@ -210,13 +212,13 @@ package object decode {
    * used predictably when the returned decoder will be interleaved with another
    * decoder, as in `sepBy`, or any other combinator that uses `tee`.
    */
-  def manyChunked[A](chunkSize: Int)(implicit A: Decoder[A]): StreamDecoder[A] =
+  def manyChunked[A](chunkSize: Int)(implicit A: Lazy[Decoder[A]]): StreamDecoder[A] =
     if (chunkSize < 1) throw new IllegalArgumentException("chunk size must be positive: " + chunkSize)
     else ask.map(Box(_)) flatMap { box =>
       var cur = box.get; box.clear()
       val buf = new collection.mutable.ArrayBuffer[A]
       while (cur.nonEmpty && buf.size < chunkSize) {
-        A.decode(cur).fold(
+        A.value.decode(cur).fold(
           msg => throw new DecodingError(msg),
           { case (rem,a) => cur = rem; buf += a }
         )
@@ -233,7 +235,7 @@ package object decode {
    * exhausts `in` and leaves no trailing bits. The returned stream terminates
    * with an error if the `Decoder[A]` ever fails on the input.
    */
-  def many[A](implicit A: Decoder[A]): StreamDecoder[A] =
+  def many[A](implicit A: Lazy[Decoder[A]]): StreamDecoder[A] =
     once[A].many
 
   /**
@@ -241,16 +243,16 @@ package object decode {
    * elements are decoded. The returned stream will have at least one
    * element if it succeeds.
    */
-  def many1[A:Decoder]: StreamDecoder[A] =
+  def many1[A](implicit A: Lazy[Decoder[A]]): StreamDecoder[A] =
     many[A].nonEmpty(Err("many1 produced no outputs"))
 
   /**
    * Like `many`, but parses and ignores a `D` delimiter value in between
    * decoding each `A` value.
    */
-  def sepBy[A:Decoder,D:Decoder]: StreamDecoder[A] =
+  def sepBy[A, D](implicit A: Lazy[Decoder[A]], D: Lazy[Decoder[D]]): StreamDecoder[A] =
     once[A] flatMap { hd =>
-      emit(hd) ++ many(Decoder[D] ~ Decoder[A]).map(_._2)
+      emit(hd) ++ many(D.value ~ A.value).map(_._2)
     }
 
   /**
@@ -258,8 +260,8 @@ package object decode {
    * elements are decoded. The returned stream will have at least one
    * element if it succeeds.
    */
-  def sepBy1[A:Decoder,D:Decoder]: StreamDecoder[A] =
-    sepBy[A,D].nonEmpty(Err("sepBy1 given empty input"))
+  def sepBy1[A, D](implicit A: Lazy[Decoder[A]], D: Lazy[Decoder[D]]): StreamDecoder[A] =
+    sepBy[A, D].nonEmpty(Err("sepBy1 given empty input"))
 
   private implicit class DecoderSyntax[A](A: Decoder[A]) {
     def ~[B](B: Decoder[B]): Decoder[(A,B)] = new Decoder[(A,B)] {

@@ -8,6 +8,8 @@ import scalaz.concurrent.Task
 import scodec.{ Decoder, Err }
 import scodec.bits.BitVector
 
+import shapeless.Lazy
+
 /**
  * A streaming decoding process, represented as a stream of state
  * actions on [[scodec.bits.BitVector]]. Most clients will typically
@@ -40,7 +42,7 @@ trait StreamDecoder[+A] {
   final def decode(bits: => BitVector): Process[Task,A] = Process.suspend {
     @volatile var cur = bits // am pretty sure this doesn't need to be volatile, but just being safe
     decoder.translate(new (Cursor ~> Task) {
-      def apply[A](c: Cursor[A]): Task[A] = Task.suspend {
+      def apply[X](c: Cursor[X]): Task[X] = Task.suspend {
         c.run(cur).fold(
           msg => Task.fail(DecodingError(msg)),
           { case (rem,a) => Task.now { cur = rem; a } }
@@ -222,7 +224,7 @@ trait StreamDecoder[+A] {
    * Alternate between decoding `A` values using this `StreamDecoder`,
    * and decoding `B` values which are ignored.
    */
-  def sepBy[B:Decoder]: StreamDecoder[A] =
+  def sepBy[B](implicit B: Lazy[Decoder[B]]): StreamDecoder[A] =
     tee(D.many[B])((Process.awaitL[A] fby Process.awaitR[B].drain).repeat)
 
   /** Decode at most `n` values using this `StreamDecoder`. */
