@@ -30,7 +30,7 @@ __Links:__
     * [Decoding](#decoding)
     * [Encoding](#encoding)
 * [API docs][api]
-* [Scodec mailing list](https://groups.google.com/forum/#!forum/scodec)
+* [Typelevel mailing list](https://groups.google.com/forum/#!forum/typelevel)
 * [scodec-protocols](https://github.com/scodec/scodec-protocols) has useful streaming encoders and decoders for various domains and is a nice place to look for examples of the library in use.
 
 [api]: http://www.google.com/?q=scodec-stream+api
@@ -39,7 +39,7 @@ __Links:__
 
 This project is licensed under a [3-clause BSD license](LICENSE).
 
-The [scodec mailing list](https://groups.google.com/forum/#!forum/scodec) contains release announcements and is generally a good place to go for help. Also consider using the [scodec tag on StackOverflow](http://stackoverflow.com/questions/tagged/scodec).
+The [Typelevel mailing list](https://groups.google.com/forum/#!forum/typelevel) contains release announcements and is generally a good place to go for help. Also consider using the [scodec tag on StackOverflow](http://stackoverflow.com/questions/tagged/scodec).
 
 People are expected to follow the [Typelevel Code of Conduct](http://typelevel.org/conduct.html)
 when discussing scodec on the Github page, IRC channel, mailing list,
