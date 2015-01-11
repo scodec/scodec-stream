@@ -87,7 +87,7 @@ package object decode {
   private[decode] def runDecode[A](in: BitVector)(implicit A: Lazy[Decoder[A]]): StreamDecoder[A] =
     A.value.decode(in).fold(
       fail,
-      { case (rem,a) => set(rem) ++ emit(a) }
+      { result => set(result.remainder) ++ emit(result.value) }
     )
 
   /** Run the given `Decoder` once and emit its result, if successful. */
@@ -102,7 +102,7 @@ package object decode {
   def tryOnce[A](implicit A: Lazy[Decoder[A]]): StreamDecoder[A] = ask flatMap { in =>
     A.value.decode(in).fold(
       _ => halt,
-      { case (rem,a) => set(rem) ++ emit(a) }
+      { result => set(result.remainder) ++ emit(result.value) }
     )
   }
 
@@ -110,8 +110,8 @@ package object decode {
   private def consume[A](A: Decoder[A])(bits: BitVector, acc: Vector[A]):
       (BitVector, Vector[A], Err) =
     A.decode(bits) match {
-      case -\/(err) => (bits, acc, err)
-      case \/-((rem,a)) => consume(A)(rem, acc :+ a)
+      case Attempt.Failure(err) => (bits, acc, err)
+      case Attempt.Successful(DecodeResult(a, rem)) => consume(A)(rem, acc :+ a)
     }
 
   /**
@@ -165,7 +165,7 @@ package object decode {
         while (cur.nonEmpty && buf.size < chunkSize) {
           A.value.decode(cur).fold(
             msg => throw new DecodingError(msg),
-            { case (rem,a) => cur = rem; buf += a }
+            { result => cur = result.remainder; buf += result.value }
           )
         }
         set(cur) ++ {
@@ -220,7 +220,7 @@ package object decode {
       while (cur.nonEmpty && buf.size < chunkSize) {
         A.value.decode(cur).fold(
           msg => throw new DecodingError(msg),
-          { case (rem,a) => cur = rem; buf += a }
+          { result => cur = result.remainder; buf += result.value }
         )
       }
       set(cur) ++ {

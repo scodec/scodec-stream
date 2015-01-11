@@ -26,7 +26,7 @@ object Mpeg extends App {
     val mpegPcapDecoder: StreamDecoder[MpegPacket] = pcapRecordStreamDecoder flatMapP { record =>
       // Drop 22 byte ethernet frame header and 20 byte IPv4/udp header
       val datagramPayloadBits = record.data.drop(22 * 8).drop(20 * 8)
-      val packets = codecs.vector(Codec[MpegPacket]).decodeValue(datagramPayloadBits)
+      val packets = codecs.vector(Codec[MpegPacket]).decode(datagramPayloadBits).map { _.value }
       Process.emitAll(packets.getOrElse(Seq.empty))
     }
 
@@ -77,9 +77,9 @@ object PcapCodec {
   private val magicNumber = 0x000000a1b2c3d4L
   val byteOrdering = "magic_number" | Codec[ByteOrdering](
     (bo: ByteOrdering) => if (bo == BigEndian) uint32.encode(magicNumber) else uint32L.encode(magicNumber),
-    (buf: BitVector) => uint32.decode(buf).map { case (rest, mn) =>
-      (rest, if (mn == magicNumber) BigEndian else LittleEndian)
-    }
+    (buf: BitVector) => uint32.decode(buf).map { _ mapValue { mn =>
+      if (mn == magicNumber) BigEndian else LittleEndian
+    }}
   )
 
   def gint16(implicit ordering: ByteOrdering): Codec[Int] = if (ordering == BigEndian) int16 else int16L

@@ -17,7 +17,7 @@ object SpaceLeakTest extends Properties("space-leak") {
     val N = 400000
     val M = 5
     val chunk = (0 until M).toVector
-    def chunks = BitVector.unfold(0)(_ => Some(ints.encodeValid(chunk) -> 0))
+    def chunks = BitVector.unfold(0)(_ => Some(ints.encode(chunk).require -> 0))
     val dec = many(ints).take(N)
             . flatMap(chunk => emitAll(chunk))
             . pipe(process1.sum)

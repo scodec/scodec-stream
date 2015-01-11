@@ -1,5 +1,3 @@
-addSbtPlugin("com.typesafe.sbt" % "sbt-osgi" % "0.6.0")
+resolvers += "Sonatype Public" at "https://oss.sonatype.org/content/groups/public/"
 
-addSbtPlugin("com.github.gseitz" % "sbt-release" % "0.8")
-
-addSbtPlugin("com.typesafe.sbt" % "sbt-pgp" % "0.8")
+addSbtPlugin("org.scodec" % "scodec-build" % "1.0.0-SNAPSHOT")

@@ -5,7 +5,7 @@ import Prop._
 import scalaz.\/._
 import scalaz.stream.Process
 import scodec.bits.BitVector
-import scodec.{ Decoder, Err }
+import scodec.{ Attempt, Decoder, Err }
 import scodec.codecs._
 import scodec.stream.{decode => D, encode => E}
 
@@ -15,7 +15,7 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
     implicit val arbLong = Arbitrary(Gen.choose(1L,500L)) // chunk sizes
 
     forAll { (ints: List[Int], n: Long) =>
-      val bits = vector(int32).encodeValid(Vector.empty[Int] ++ ints)
+      val bits = vector(int32).encode(Vector.empty[Int] ++ ints).require
       val bits2 = E.many(int32).encodeAllValid(ints)
       bits == bits2 &&
       D.once(int32).many.decodeAllValid(bits).toList == ints &&
@@ -50,7 +50,7 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
   }
 
   property("isolate") = forAll { (ints: List[Int]) =>
-    val bits = vector(int32).encodeValid(ints.toVector)
+    val bits = vector(int32).encode(ints.toVector).require
     val p =
       D.many(int32).isolate(bits.size).map(_ => 0) ++
       D.many(int32).isolate(bits.size).map(_ => 1)
@@ -65,7 +65,7 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
     val p3 = D.once(int32).many | D.once(int32).many
     val p4 = p3 or p1
     def fail(err: Err): Decoder[Nothing] = new Decoder[Nothing] {
-      def decode(bits: BitVector) = left(err)
+      def decode(bits: BitVector) = Attempt.failure(err)
     }
     val failing = D.tryOnce(uint8.flatMap { _ => fail(Err("!!!")) })
     // NB: this fails as expected - since `once` does not backtrack
@@ -81,7 +81,7 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
   val string = variableSizeBytes(int32, utf8)
 
   property("sepBy") = forAll { (ints: List[Int], delim: String) =>
-    val e = E.once(int32) ++ E.many(int32).mapBits(string.encodeValid(delim) ++ _)
+    val e = E.once(int32) ++ E.many(int32).mapBits(string.encode(delim).require ++ _)
     val encoded = e.encodeAllValid(ints)
     D.many(int32).sepBy(string).decodeAllValid(encoded).toList ?= ints
   }
@@ -129,7 +129,7 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
 
   property("toLazyBitVector") = {
     forAll { (ints: List[Int]) =>
-      val bvs = ints.map { i => int32.encodeValid(i) }
+      val bvs = ints.map { i => int32.encode(i).require }
       toLazyBitVector(Process.emitAll(bvs)) == bvs.foldLeft(BitVector.empty) { _ ++ _ }
     }
   }
