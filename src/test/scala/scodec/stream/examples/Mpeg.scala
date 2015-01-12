@@ -77,7 +77,7 @@ object PcapCodec {
   private val magicNumber = 0x000000a1b2c3d4L
   val byteOrdering = "magic_number" | Codec[ByteOrdering](
     (bo: ByteOrdering) => if (bo == BigEndian) uint32.encode(magicNumber) else uint32L.encode(magicNumber),
-    (buf: BitVector) => uint32.decode(buf).map { _ mapValue { mn =>
+    (buf: BitVector) => uint32.decode(buf).map { _ map { mn =>
       if (mn == magicNumber) BigEndian else LittleEndian
     }}
   )
