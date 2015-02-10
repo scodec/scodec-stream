@@ -9,7 +9,7 @@ rootPackage := "scodec.stream"
 resolvers += "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"
 
 libraryDependencies ++= Seq(
-  "org.scodec" %% "scodec-core" % "1.7.0-SNAPSHOT",
+  "org.scodec" %% "scodec-core" % "1.7.0",
   "org.scalaz.stream" %% "scalaz-stream" % "0.6a",
   "org.scalacheck" %% "scalacheck" % "1.11.3" % "test"
 )
