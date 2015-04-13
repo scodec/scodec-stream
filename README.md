@@ -150,3 +150,8 @@ t.run
 ```
 
 Calling `t.run` will do a streaming decode of the `"largefile.bin"` file, skipping the first 64 bits, then a stream of signed 32 bit ints, which it downsamples to 16 bits and streams to the output file `"smallerfile.bin"`, raising an [`EncodingError`][enc-err] in the event of a format error or if an integer from the input fails to fit within 16 bits.
+
+Getting Binaries
+----------------
+
+See the [releases page on the website](https://scodec.org/releases/).
