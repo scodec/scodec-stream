@@ -25,7 +25,7 @@ Decoding speeds have been observed at 100 MB/s for some realistic examples ([dec
 __Links:__
 
 * [Administrative](#admin)
-* [Where to get it](#where-to-get-it)
+* [Getting Binaries](#getting-binaries)
 * [Usage guide](#guide)
     * [Decoding](#decoding)
     * [Encoding](#encoding)
@@ -48,19 +48,9 @@ or other venues.
 Concerns or issues can be sent to Michael Pilquist (*mpilquist@gmail.com*) or
 to [Typelevel](http://typelevel.org/about.html).
 
-### Where to get it
+### Getting Binaries
 
-The latest stable build is 0.6.0. Note: There are no source or binary compatibility guarantees offered at this point.
-
-```Scala
-libraryDependencies += "org.typelevel" %% "scodec-stream" % "0.6.0"
-```
-
-The latest development version is available as:
-
-```Scala
-libraryDependencies += "org.typelevel" %% "scodec-stream" % "0.7.0-SNAPSHOT"
-```
+See the [releases page on the website](https://scodec.org/releases/).
 
 Sign up for the [mailing list](https://groups.google.com/forum/#!forum/scodec) if you want to be notified of future releases.
 
