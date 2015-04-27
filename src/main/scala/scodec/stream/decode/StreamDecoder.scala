@@ -2,10 +2,11 @@ package scodec.stream.decode
 
 import java.io.InputStream
 import java.nio.channels.{FileChannel, ReadableByteChannel}
+import scala.util.control.NonFatal
 import scalaz.{~>,\/,MonadPlus}
 import scalaz.stream.{Process,Process1,process1,Tee}
 import scalaz.concurrent.Task
-import scodec.{ Decoder, Err }
+import scodec.{ Attempt, Decoder, DecodeResult, Err }
 import scodec.bits.BitVector
 
 import shapeless.Lazy
@@ -16,7 +17,7 @@ import shapeless.Lazy
  * use one of the decoding convenience methods on this class, rather
  * than using `decoder` directly.
  */
-trait StreamDecoder[+A] {
+trait StreamDecoder[+A] { self =>
 
   import scodec.stream.{decode => D}
 
@@ -45,7 +46,7 @@ trait StreamDecoder[+A] {
       def apply[X](c: Cursor[X]): Task[X] = Task.suspend {
         c.run(cur).fold(
           msg => Task.fail(DecodingError(msg)),
-          { case (rem,a) => Task.now { cur = rem; a } }
+          res => Task.now { cur = res.remainder; res.value }
         )
       }
     })
@@ -269,6 +270,21 @@ trait StreamDecoder[+A] {
    */
   final def tee[B,C](d: StreamDecoder[B])(t: Tee[A,B,C]): StreamDecoder[C] =
     edit { _.tee(d.decoder)(t) }
+
+  /** Create a strict (i.e., non-stream) decoder. */
+  final def strict: Decoder[Vector[A]] = new Decoder[Vector[A]] {
+    def decode(bits: BitVector) = {
+      try {
+        val result = (self ++ D.ask).decode(bits).chunkAll.runLastOr(Vector.empty).run
+        val as = result.init.asInstanceOf[Vector[A]]
+        val remainder = result.last.asInstanceOf[BitVector]
+        Attempt.successful(DecodeResult(as, remainder))
+      } catch {
+        case e: DecodingError => Attempt.failure(e.err)
+        case NonFatal(e) => Attempt.failure(Err(e.getMessage))
+      }
+    }
+  }
 }
 
 object StreamDecoder {
