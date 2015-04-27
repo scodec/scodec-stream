@@ -1,20 +1,15 @@
 package scodec.stream.decode
 
-import scalaz.stream.{Process,process1}
-import scalaz.stream.{Process => P}
-import scalaz.concurrent.Task
-import scalaz.{\/,Catchable,Monad,MonadPlus}
-import scalaz.\/.{left,right}
-import scodec.Err
+import scodec.{ Attempt, DecodeResult }
 import scodec.bits.BitVector
 
-case class Cursor[+A](run: BitVector => Err \/ (BitVector,A))
+case class Cursor[+A](run: BitVector => Attempt[DecodeResult[A]])
 
 object Cursor {
-  def ask: Cursor[BitVector] = Cursor { bits => right(bits -> bits) }
-  def set(bits: BitVector) = Cursor { _ => right(bits -> bits) }
-  def modify(f: BitVector => BitVector) = Cursor { bits =>
-    val r = f(bits)
-    right(r -> r)
+  def ask: Cursor[BitVector] = Cursor { current => Attempt.successful(DecodeResult(current, current)) }
+  def set(bits: BitVector) = Cursor { _ => Attempt.successful(DecodeResult(bits, bits)) }
+  def modify(f: BitVector => BitVector) = Cursor { current =>
+    val modified = f(current)
+    Attempt.successful(DecodeResult(modified, modified))
   }
 }
