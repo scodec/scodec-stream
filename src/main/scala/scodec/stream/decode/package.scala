@@ -155,7 +155,7 @@ package object decode {
 
   /**
    * Like `scodec.stream.decode.tryMany`, but reads up to `chunkSize` elements
-   * at once. As mentioned in [[scodec.stream.decode.manyChunks]], the resulting
+   * at once. As mentioned in [[scodec.stream.decode.manyChunked]], the resulting
    * decoder cannot be meaningfully interleaved with other decoders.
    */
   def tryManyChunked[A](chunkSize: Int)(implicit A: Lazy[Decoder[A]]): StreamDecoder[A] =
