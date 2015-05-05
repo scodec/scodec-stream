@@ -10,15 +10,15 @@ package object encode {
 
   /** The encoder that consumes no input and halts with the given error. */
   def fail(err: Throwable): StreamEncoder[Nothing] =
-    StreamEncoder.instance { P.fail(err) }
+    StreamEncoder.instance[Nothing] { P.fail(err) }
 
   /** The encoder that consumes no input and halts with the given error message. */
   def fail(err: Err): StreamEncoder[Nothing] =
-    StreamEncoder.instance { P.fail(EncodingError(err)) }
+    StreamEncoder.instance[Nothing] { P.fail(EncodingError(err)) }
 
   /** The encoder that consumes no input and emits no values. */
   val halt: StreamEncoder[Nothing] =
-    StreamEncoder.instance { P.halt }
+    StreamEncoder.instance[Nothing] { P.halt }
 
   /** A `StreamEncoder` which encodes a stream of values. */
   def many[A](implicit A: Lazy[Encoder[A]]): StreamEncoder[A] =
@@ -34,7 +34,7 @@ package object encode {
 
   /** A `StreamEncoder` that emits the given `BitVector`, then halts. */
   def emit(bits: BitVector): StreamEncoder[Nothing] =
-    StreamEncoder.instance { scalaz.stream.Process.emit(bits) }
+    StreamEncoder.instance[Nothing] { scalaz.stream.Process.emit(bits) }
 
   /**
    * A `StreamEncoder` which encodes a single value, then halts.

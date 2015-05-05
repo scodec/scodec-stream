@@ -1,10 +1,12 @@
 package scodec
 package stream
 
-import scalaz.stream.{Process,process1,Process1,Tee}
-import scalaz.stream.{Process => P}
+import language.higherKinds
+
+import scalaz.stream.{ Process, process1, Process1 }
+import scalaz.stream.{ Process => P }
 import scalaz.concurrent.Task
-import scalaz.{\/,-\/,\/-,~>,Monad,MonadPlus}
+import scalaz.{ \/, -\/, \/-, Monad, MonadPlus }
 import scodec.bits.BitVector
 
 import shapeless.Lazy

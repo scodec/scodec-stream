@@ -2,7 +2,6 @@ package scodec.stream.decode
 
 import org.scalacheck._
 import Prop._
-import scala.concurrent.duration._
 import scalaz.stream.{Process,process1}
 import scodec.{Codec,codecs => C}
 import scodec.bits.BitVector

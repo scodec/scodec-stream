@@ -7,7 +7,6 @@ import scodec.stream._
 import scodec.stream.decode.DecodingError
 
 import scalaz.std.AllInstances._
-import scalaz.syntax.id._
 import scalaz.stream.Process
 import scalaz.concurrent.Task
 
@@ -53,7 +52,7 @@ object Mpeg extends App {
     result
   }
   print("Enter path to a large pcap mpeg file: ")
-  val line = readLine()
+  val line = io.StdIn.readLine()
   def channel = new FileInputStream(new File(line)).getChannel
   val result2 = time("coarse-grained") { streamThroughRecordsOnly.decodeMmap(channel).runFoldMap(_ => 1).run }
   val result1 = time("fine-grained") { streamier.decodeMmap(channel).runFoldMap(_ => 1).run }
@@ -115,7 +114,7 @@ object PcapCodec {
 
   implicit def pcapRecord(implicit ordering: ByteOrdering) = {
     ("record_header"    | pcapRecordHeader                   ) >>:~ { hdr =>
-    ("record_data"      | bits(hdr.includedLength.toInt * 8) ).hlist
+    ("record_data"      | bits(hdr.includedLength * 8)       ).hlist
   }}.as[PcapRecord]
 
   case class PcapFile(header: PcapHeader, records: Vector[PcapRecord])

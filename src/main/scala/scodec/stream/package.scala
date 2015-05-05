@@ -1,6 +1,6 @@
 package scodec
 
-import scalaz.stream.{ Process1, Process, async }
+import scalaz.stream.{ Process, async }
 import scalaz.concurrent.{ Strategy, Task }
 
 import scodec.bits.BitVector

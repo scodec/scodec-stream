@@ -1,7 +1,7 @@
 package scodec.stream
 package codec
 
-import scalaz.stream.{Process1,process1}
+import scalaz.stream.Process1
 import scodec.bits.BitVector
 
 trait StreamGenCodec[-I,+O] extends StreamEncoder[I] with StreamDecoder[O] { self =>

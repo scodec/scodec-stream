@@ -1,6 +1,8 @@
 package scodec.stream.encode
 
-import scalaz.stream.{Process,Process1,process1,tee,Tee}
+import language.higherKinds
+
+import scalaz.stream.{ Process, Process1, process1, tee }
 import scodec.bits.BitVector
 
 /**

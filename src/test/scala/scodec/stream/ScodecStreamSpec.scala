@@ -2,7 +2,6 @@ package scodec.stream
 
 import org.scalacheck._
 import Prop._
-import scalaz.\/._
 import scalaz.stream.Process
 import scodec.bits.BitVector
 import scodec.{ Attempt, Decoder, Err }
@@ -96,7 +95,7 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
     decoded.runLog.run.toList == strings && // normal termination
     decoded.take(2).runLog.run.toList == strings.take(2) && // early termination
     { // exceptions
-      val failed = decoded.take(3).map(_ => { sys.error("die"); "fail" }).runLog.attemptRun.isLeft
+      val failed = decoded.take(3).map(_ => sys.error("die")).runLog.attemptRun.isLeft
       strings.isEmpty || failed
     } &&
     cleanedUp == 3
@@ -114,13 +113,13 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
     new Properties("fixed size") {
       property("strings") = forAll { (strings: List[String], chunkSize: Chunk) =>
         val bits = E.many(string).encodeAllValid(strings)
-        val chunks = Process.emitAll(bits.grouped(chunkSize.get)).toSource
+        val chunks = Process.emitAll(bits.grouped(chunkSize.get.toLong)).toSource
         val d = D.process(string)
         (chunks pipe d).runLog.run.toList == strings
       }
       property("ints") = forAll { (ints: List[Int], chunkSize: Chunk) =>
         val bits = E.many(int32).encodeAllValid(ints)
-        val chunks = Process.emitAll(bits.grouped(chunkSize.get)).toSource
+        val chunks = Process.emitAll(bits.grouped(chunkSize.get.toLong)).toSource
         val d = D.process(int32)
         (chunks pipe d).runLog.run.toList == ints
       }
