@@ -80,7 +80,7 @@ trait StreamDecoder[+A] { self =>
   /**
    * Resource-safe version of `decode` for an `InputStream` resource.
    * This is just a convenience function which calls [[decodeResource]], using
-   * [[scodec.bits.BitVector.fromInputStream]] as the `read` function, and which
+   * `scodec.bits.BitVector.fromInputStream` as the `read` function, and which
    * closes `in` after the returned `Process[Task,A]` is consumed.
    */
   final def decodeInputStream(
@@ -91,7 +91,7 @@ trait StreamDecoder[+A] { self =>
   /**
    * Resource-safe version of `decode` for a `ReadableByteChannel` resource.
    * This is just a convenience function which calls [[decodeResource]], using
-   * [[scodec.bits.BitVector.fromChannel]] as the `read` function, and which
+   * `scodec.bits.BitVector.fromChannel` as the `read` function, and which
    * closes `in` after the returned `Process[Task,A]` is consumed.
    */
   final def decodeChannel(
@@ -103,7 +103,7 @@ trait StreamDecoder[+A] { self =>
   /**
    * Resource-safe version of `decode` for a `ReadableByteChannel` resource.
    * This is just a convenience function which calls [[decodeResource]], using
-   * [[scodec.bits.BitVector.fromChannel]] as the `read` function, and which
+   * `scodec.bits.BitVector.fromChannel` as the `read` function, and which
    * closes `in` after the returned `Process[Task,A]` is consumed.
    */
   final def decodeMmap(
@@ -205,7 +205,7 @@ trait StreamDecoder[+A] { self =>
   /**
    * Run this `StreamDecoder`, then `d`, then concatenate the two streams,
    * even if `this` halts with an error. The error will be reraised when
-   * `d` completes. See [[scalaz.stream.Process.onComplete]].
+   * `d` completes. See `scalaz.stream.Process.onComplete`.
    */
   final def onComplete[A2>:A](d: => StreamDecoder[A2]): StreamDecoder[A2] =
     edit { _ onComplete d.decoder }
