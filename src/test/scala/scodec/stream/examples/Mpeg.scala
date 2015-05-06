@@ -51,7 +51,7 @@ object Mpeg extends App {
     println(s"$label took ${(stop.toDouble-start) / 1000.0} s")
     result
   }
-  def channel = new FileInputStream(new File(???)).getChannel
+  def channel = new FileInputStream(new File("path/to/file")).getChannel
   val result2 = time("coarse-grained") { streamThroughRecordsOnly.decodeMmap(channel).runFoldMap(_ => 1).run }
   val result1 = time("fine-grained") { streamier.decodeMmap(channel).runFoldMap(_ => 1).run }
   println("fine-grained stream packet count: " + result1)
