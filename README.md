@@ -103,7 +103,7 @@ The model of a [`StreamEncoder[A]`][enc] is a `Process1[A,BitVector]`, where `Pr
 
 [enc-err]: https://github.com/scodec/scodec-stream/blob/master/src/main/scala/scodec/stream/encode/EncodingError.scala
 
-We are currently still discovering nice combinators for building up `StreamEncoder` values. Assuming you have imported `scodec.stream.{encode,StreamEncoder}` and `scodec.codecs`, the [key][] [combinators][enc] far are:
+We are currently still discovering nice combinators for building up `StreamEncoder` values. Assuming you have imported `scodec.stream.{encode,StreamEncoder}` and `scodec.codecs`, the [key][] [combinators][enc] so far are:
 
 * `encode.once`: A `scodec.Encoder[A] => StreamEncoder[A]` which encode a single `A` to the output, then halts. For example, `encode.once(codecs)`
 * `encode.many` or `e.many`: A `scodec.Encoder[A] => StreamEncoder[A]` which encodes multiple `A` values to the output, halting only when the input `A` stream is exhausted. Example: `encode.many(codecs.int16)` encodes zero or more integers, each of which is expected to fit within 16 bits.
