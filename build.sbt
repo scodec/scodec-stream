@@ -1,6 +1,7 @@
 scodecModule := "scodec-stream"
 
 scodecPrimaryModule
+scodecPrimaryModuleJvm
 
 contributors ++= Seq(Contributor("mpilquist", "Michael Pilquist"), Contributor("pchiusano", "Paul Chiusano"))
 
@@ -9,7 +10,7 @@ rootPackage := "scodec.stream"
 resolvers += "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"
 
 libraryDependencies ++= Seq(
-  "org.scodec" %% "scodec-core" % "1.7.1",
+  "org.scodec" %% "scodec-core" % "1.8.0",
   "org.scalaz.stream" %% "scalaz-stream" % "0.7a",
   "org.scalacheck" %% "scalacheck" % "1.11.3" % "test"
 )
