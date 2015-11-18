@@ -11,7 +11,7 @@ resolvers += "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"
 
 libraryDependencies ++= Seq(
   "org.scodec" %% "scodec-core" % "1.9.0-SNAPSHOT",
-  "org.scalaz.stream" %% "scalaz-stream" % "0.7a",
+  "org.scalaz.stream" %% "scalaz-stream" % "0.8-5df9505-SNAPSHOT",
   "org.scalacheck" %% "scalacheck" % "1.11.3" % "test"
 )
 
@@ -27,3 +27,5 @@ OsgiKeys.importPackage := Seq(
   """scodec.*;version="$<range;[==,=+);$<@>>"""",
   "*"
 )
+
+scalacOptions := Nil
