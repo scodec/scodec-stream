@@ -192,9 +192,12 @@ package object decode {
 
   // generic combinator, this could be added to scalaz-stream
   private def orImpl[F[_],A](p1: Stream[F,A], p2: Stream[F,A]): Stream[F,A] = {
-    p1.pull2(p2)((h1, h2) =>
-      Pull.echo(h1) or Pull.echo(h2)
-    )
+    p1.pull2(p2)((p1,p2) =>
+      (p1.awaitNonempty.map(Some(_)) or Pull.pure(None)).flatMap {
+        case None => Pull.echo(p2)
+        case Some(hd #: p1) =>
+          Pull.output(hd) >> Pull.echo(p1)
+      })
   }
 
   /**

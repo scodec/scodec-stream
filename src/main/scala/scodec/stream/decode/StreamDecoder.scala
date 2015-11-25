@@ -3,11 +3,12 @@ package scodec.stream.decode
 import java.io.InputStream
 import java.nio.channels.{FileChannel, ReadableByteChannel}
 import fs2._
-import fs2.util.Task
-import fs2.util.UF1.{~>}
+import Step.#:
+import fs2.util.{ ~>, Task }
 import scala.util.control.NonFatal
 import scodec.{ Attempt, Decoder, DecodeResult, Err }
 import scodec.bits.BitVector
+import shapeless.Lazy
 
 /**
  * A streaming decoding process, represented as a stream of state
@@ -177,12 +178,14 @@ trait StreamDecoder[+A] { self =>
    * otherwise runs `p` as normal.
    */
   def nonEmpty(errIfEmpty: Err): StreamDecoder[A] =
-    ??? // TODO
-    // pipe {
-    //   Stream.receive1Or[A, A](
-    //     Stream.fail(DecodingError(errIfEmpty))
-    //   )(Stream.emit).flatMap(process1.shiftRight(_))
-    // }
+    pipe { s =>
+      s.open.flatMap { h =>
+        Pull.awaitOption(h).flatMap {
+          case None => Pull.fail(DecodingError(errIfEmpty))
+          case Some(a #: h1) => Pull.output(a) >> Pull.echo(h1)
+        }
+      }.run
+    }
 
   /**
    * Alias for `scodec.stream.decode.or(this,d)`.
@@ -217,12 +220,12 @@ trait StreamDecoder[+A] { self =>
   final def |>[B](p: Process1[A,B]): StreamDecoder[B] =
     pipe(p)
 
-//   /**
-//    * Alternate between decoding `A` values using this `StreamDecoder`,
-//    * and decoding `B` values which are ignored.
-//    */
-//   def sepBy[B](implicit B: Lazy[Decoder[B]]): StreamDecoder[A] =
-//     tee(D.many[B])((Process.awaitL[A] fby Process.awaitR[B].drain).repeat)
+  /**
+   * Alternate between decoding `A` values using this `StreamDecoder`,
+   * and decoding `B` values which are ignored.
+   */
+  def sepBy[B](implicit B: Lazy[Decoder[B]]): StreamDecoder[A] =
+    ??? // TODO tee(D.many[B])((Process.awaitL[A] fby Process.awaitR[B].drain).repeat)
 
   /** Decode at most `n` values using this `StreamDecoder`. */
   def take(n: Int): StreamDecoder[A] =
@@ -257,15 +260,15 @@ trait StreamDecoder[+A] { self =>
   /** Alias for `[[scodec.stream.decode.peek]](this)`. */
   def peek: StreamDecoder[A] = D.peek(this)
 
-//   /**
-//    * Combine the output of this `StreamDecoder` with another streaming
-//    * decoder, using the given binary stream transducer. Note that both
-//    * `d` and `this` will operate on the same input `BitVector`, so this
-//    * combinator is more useful for expressing alternation between two
-//    * decoders.
-//    */
-//   final def tee[B,C](d: StreamDecoder[B])(t: Tee[A,B,C]): StreamDecoder[C] =
-//     edit { _.tee(d.decoder)(t) }
+  /**
+   * Combine the output of this `StreamDecoder` with another streaming
+   * decoder, using the given binary stream transducer. Note that both
+   * `d` and `this` will operate on the same input `BitVector`, so this
+   * combinator is more useful for expressing alternation between two
+   * decoders.
+   */
+  final def tee[B,C](d: StreamDecoder[B])(t: Tee[A,B,C]): StreamDecoder[C] =
+    edit { _.tee(d.decoder)(t) }
 
   /** Create a strict (i.e., non-stream) decoder. */
   final def strict: Decoder[Vector[A]] = new Decoder[Vector[A]] {
