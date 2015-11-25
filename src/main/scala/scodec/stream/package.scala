@@ -12,8 +12,8 @@ package object stream {
   type StreamEncoder[A] = scodec.stream.encode.StreamEncoder[A]
   val StreamEncoder = scodec.stream.encode.StreamEncoder
 
-  // type StreamCodec[A] = scodec.stream.codec.StreamCodec[A]
-  // val StreamCodec = scodec.stream.codec.StreamCodec
+  type StreamCodec[A] = scodec.stream.codec.StreamCodec[A]
+  val StreamCodec = scodec.stream.codec.StreamCodec
 
   /** Constructs a lazy `BitVector` by continuously reading from the supplied process until it halts. */
   def toLazyBitVector(p: Process[Task, BitVector], bufferSize: Int = 100): BitVector = {

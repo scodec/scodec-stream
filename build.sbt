@@ -11,7 +11,7 @@ resolvers += "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"
 
 libraryDependencies ++= Seq(
   "org.scodec" %% "scodec-core" % "1.8.3",
-  "org.scalaz.stream" %% "scalaz-stream" % "0.8-14c5e06-SNAPSHOT",
+  "org.scalaz.stream" %% "scalaz-stream" % "0.8-c311279",
   "org.scalacheck" %% "scalacheck" % "1.11.3" % "test"
 )
 

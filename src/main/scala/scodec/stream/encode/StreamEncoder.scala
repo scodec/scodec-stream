@@ -13,7 +13,7 @@ import scodec.bits.BitVector
 trait StreamEncoder[A] {
   import StreamEncoder._
 
-  def step: StreamEncoder.Step[A]
+  def encoder: StreamEncoder.Step[A]
 
   /**
    * Encode the given sequence of `A` values to a `BitVector`, raising an exception
@@ -28,17 +28,17 @@ trait StreamEncoder[A] {
       Sub1.subst[({type f[g[_],x] = Stream.Handle[g,x] => Pull[g, BitVector, (Stream.Handle[g,x], StreamEncoder[A])]})#f, Pure, F, A](s)
 
     def go(h: Stream.Handle[F, A], encoder: StreamEncoder[A]): Pull[F, BitVector, (Stream.Handle[F, A], Option[StreamEncoder[A]])] = {
-      substStep(encoder.step)(h) flatMap { case (h1, next) => go(h1, next) }
+      substStep(encoder.encoder)(h) flatMap { case (h1, next) => go(h1, next) }
     }
     in.open.flatMap(h => go(h, this)).run
   }
 
   /** Modify the `Pull` backing this `StreamEncoder`. */
   def edit[B](f: StreamEncoder.Step[A] => StreamEncoder.Step[B]): StreamEncoder[B] =
-    StreamEncoder.instance { f(step) }
+    StreamEncoder.instance { f(encoder) }
 
   def or(other: StreamEncoder[A]): StreamEncoder[A] =
-    edit[A] { o => h => o(h) or other.step(h) }
+    edit[A] { o => h => o(h) or other.encoder(h) }
 
   /** Encode values as long as there are more inputs. */
   def many: StreamEncoder[A] = this ++ many
@@ -62,10 +62,8 @@ object StreamEncoder {
 
   type Step[A] = Stream.Handle[Pure, A] => Pull[Pure, BitVector, (Stream.Handle[Pure, A], StreamEncoder[A])]
 
-  def instance[A](step: Step[A]): StreamEncoder[A] = {
-    val s = step
-    new StreamEncoder[A] { val step = s }
-  }
+  def instance[A](step: Step[A]): StreamEncoder[A] =
+    new StreamEncoder[A] { val encoder = step }
 
   /** Conjure up a `StreamEncoder[A]` from implicit scope. */
   def apply[A](implicit A: StreamEncoder[A]): StreamEncoder[A] = A
