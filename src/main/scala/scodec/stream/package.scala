@@ -16,10 +16,10 @@ package object stream {
   val StreamCodec = scodec.stream.codec.StreamCodec
 
   /** Constructs a lazy `BitVector` by continuously reading from the supplied process until it halts. */
-  def toLazyBitVector(p: Process[Task, BitVector], bufferSize: Int = 100): BitVector = {
+  def toLazyBitVector(in: Stream[Task, BitVector], bufferSize: Int = 100): BitVector = {
     ??? // TODO need async package from fs2
     // val queue = async.boundedQueue[BitVector](bufferSize)(S)
-    // p.to(queue.enqueue).onHalt { cause => Process.eval_(queue.close) }.run.runAsync(_ => ())
+    // in.to(queue.enqueue).onHalt { cause => Process.eval_(queue.close) }.run.runAsync(_ => ())
     // BitVector.unfold(()) { _ => queue.dequeue.take(1).runLast.run.map { b => (b, ()) } }
   }
 }
