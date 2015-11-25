@@ -49,41 +49,13 @@ trait StreamEncoder[A] {
 
   /** Transform the input type of this `StreamEncoder`. */
   final def xmapc[B](f: A => B)(g: B => A): StreamEncoder[B] =
-    edit { o => h => o(h.map(g)).map { case (h1, e1) => h1.map(f) -> e1.xmap(f)(g) }}
+    edit { o => h => o(h.map(g)).map { case (h1, e1) => h1.map(f) -> e1.xmapc(f)(g) }}
 
-  // /** Transform the input type of this `StreamEncoder`. */
-  // final def contramap[A0](f0: A0 => A): StreamEncoder[A0] =
-  //   contrapipe(process1.lift(f0))
-
-  // /** Transform the input type of this `StreamEncoder` using the given transducer. */
-  // final def contrapipe[A0](p: Process1[A0, A]): StreamEncoder[A0] =
-  //   edit { p andThen _ }
-
-  // /** Transform the output `BitVector` values produced by this encoder. */
-  // def mapBits(f: BitVector => BitVector): StreamEncoder[A] =
-  //   pipeBits(process1.lift(f))
-
-  // /** Statefully transform the output `BitVector` values produced by this encoder. */
-  // def pipeBits(f: Process1[BitVector, BitVector]): StreamEncoder[A] =
-  //   edit { _ andThen f }
-
-  // /** Encode at most `n` values. */
-  // def take(n: Long): StreamEncoder[A] =
-  //   contrapipe { process1.take(n) }
-
-  // /**
-  //  * Convert this `StreamEncoder` to output bits in the given chunk size.
-  //  * Only the last chunk may have fewer than `bitsPerChunk` bits.
-  //  */
-  // def chunk(bitsPerChunk: Long): StreamEncoder[A] = {
-  //   def chunker(acc: BitVector): Process1[BitVector,BitVector] = {
-  //     if (acc.size >= bitsPerChunk)
-  //       Process.emit(acc.take(bitsPerChunk)) ++ chunker(acc.drop(bitsPerChunk))
-  //     else
-  //       Process.receive1Or[BitVector, BitVector](Process.emit(acc))(bits => chunker(acc ++ bits))
-  //   }
-  //   this pipeBits { chunker(BitVector.empty) }
-  // }
+  /** Encode at most `n` values. */
+  def take(n: Int): StreamEncoder[A] = edit { step => h =>
+    if (n <= 0) Pull.done
+    else step(h) map { case (h, s2) => (h, s2.take(n-1)) }
+  }
 }
 
 object StreamEncoder {

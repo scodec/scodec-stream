@@ -36,15 +36,21 @@ package object encode {
     }
   }
 
-  // /** A `StreamEncoder` that emits the given `BitVector`, then halts. */
-  // def emit(bits: BitVector): StreamEncoder[Nothing] =
-  //   StreamEncoder.instance[Nothing] { Stream.emit(bits) }
+  /** A `StreamEncoder` that emits the given `BitVector`, then halts. */
+  def emit(bits: BitVector): StreamEncoder[Nothing] =
+    StreamEncoder.instance[Nothing] { h => Pull.output1(bits) >> Pull.pure(h -> empty) }
 
-  // /**
-  //  * A `StreamEncoder` which encodes a single value, then halts.
-  //  * Unlike `once`, encoding failures are converted to normal termination.
-  //  */
-  // def tryOnce[A](implicit A: Lazy[Encoder[A]]): StreamEncoder[A] = StreamEncoder.instance {
-  //   Stream.await1[A].flatMap { a => A.value.encode(a).fold(_ => Stream.empty, Stream.emit) }
-  // }
+  /**
+   * A `StreamEncoder` which encodes a single value, then halts.
+   * Unlike `once`, encoding failures are converted to normal termination.
+   */
+  def tryOnce[A](implicit A: Lazy[Encoder[A]]): StreamEncoder[A] = StreamEncoder.instance { h =>
+    h.await1.flatMap {
+      case a #: h1 =>
+        A.value.encode(a).fold(
+          e => Pull.pure(h1 -> empty),
+          b => Pull.output1(b) >> Pull.pure(h1 -> empty)
+        )
+    }
+  }
 }
