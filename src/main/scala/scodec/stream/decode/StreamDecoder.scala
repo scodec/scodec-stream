@@ -225,7 +225,17 @@ trait StreamDecoder[+A] { self =>
    * and decoding `B` values which are ignored.
    */
   def sepBy[B](implicit B: Lazy[Decoder[B]]): StreamDecoder[A] =
-    ??? // TODO tee(D.many[B])((Process.awaitL[A] fby Process.awaitR[B].drain).repeat)
+    tee(D.many[B]) { (value, delimiter) =>
+      value.pull2(delimiter) { (valueHandle, delimiterHandle) =>
+        def decodeValue(vh: Stream.Handle[Pure, A], dh: Stream.Handle[Pure, B]): Pull[Pure, A, Nothing] = {
+          vh.receive1 { case v #: vh1 => Pull.output1(v) >> decodeDelimiter(vh1, dh) }
+        }
+        def decodeDelimiter(vh: Stream.Handle[Pure, A], dh: Stream.Handle[Pure, B]): Pull[Pure, A, Nothing] = {
+          dh.receive1 { case d #: dh1 => decodeValue(vh, dh1) }
+        }
+        decodeValue(valueHandle, delimiterHandle)
+      }
+    }
 
   /** Decode at most `n` values using this `StreamDecoder`. */
   def take(n: Int): StreamDecoder[A] =

@@ -33,8 +33,8 @@ package object decode {
     StreamDecoder.instance { Stream.emit(a) }
 
   /** The decoder that consumes no input, emits the given `A` values, then halts. */
-  def emitAll[A](as: Seq[A]): StreamDecoder[A] =
-    StreamDecoder.instance { Stream.emitAll(as) }
+  def emits[A](as: Seq[A]): StreamDecoder[A] =
+    StreamDecoder.instance { Stream.emits(as) }
 
   /** Obtain the current input. This stream returns a single element. */
   def ask: StreamDecoder[BitVector] =
