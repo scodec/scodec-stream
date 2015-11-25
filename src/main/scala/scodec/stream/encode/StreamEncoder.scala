@@ -30,7 +30,7 @@ trait StreamEncoder[A] {
     def go(h: Stream.Handle[F, A], encoder: StreamEncoder[A]): Pull[F, BitVector, (Stream.Handle[F, A], Option[StreamEncoder[A]])] = {
       substStep(encoder.step)(h) flatMap { case (h1, next) => go(h1, next) }
     }
-    in.open.flatMap(h => go(h, this).covary[F]).run
+    in.open.flatMap(h => go(h, this)).run
   }
 
   /** Modify the `Pull` backing this `StreamEncoder`. */
@@ -41,7 +41,15 @@ trait StreamEncoder[A] {
     edit[A] { o => h => o(h) or other.step(h) }
 
   /** Encode values as long as there are more inputs. */
-  def many: StreamEncoder[A] = edit[A] { o => h => o(h).map { case (h1, next) => (h1, next or many) }}
+  def many: StreamEncoder[A] = this ++ many
+
+  /** Run this `StreamEncoder`, followed by `e`. */
+  def ++(e: => StreamEncoder[A]): StreamEncoder[A] =
+    edit { o => h => o(h).map { case (h1, next) => (h1, next or e) }}
+
+  /** Transform the input type of this `StreamEncoder`. */
+  final def xmapc[B](f: A => B)(g: B => A): StreamEncoder[B] =
+    edit { o => h => o(h.map(g)).map { case (h1, e1) => h1.map(f) -> e1.xmap(f)(g) }}
 
   // /** Transform the input type of this `StreamEncoder`. */
   // final def contramap[A0](f0: A0 => A): StreamEncoder[A0] =
@@ -60,12 +68,8 @@ trait StreamEncoder[A] {
   //   edit { _ andThen f }
 
   // /** Encode at most `n` values. */
-  // def take(n: Int): StreamEncoder[A] =
+  // def take(n: Long): StreamEncoder[A] =
   //   contrapipe { process1.take(n) }
-
-  // /** Run this `StreamEncoder`, followed by `e`. */
-  // def ++[A2 <: A](e: StreamEncoder[A2]): StreamEncoder[A2] =
-  //   edit { _ ++ e.encoder }
 
   // /**
   //  * Convert this `StreamEncoder` to output bits in the given chunk size.
