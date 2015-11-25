@@ -24,12 +24,13 @@ trait StreamEncoder[A] {
 
   /** Encode the input stream of `A` values using this `StreamEncoder`. */
   final def encode[F[_]](in: Stream[F, A]): Stream[F, BitVector] = {
-    def go(h: Stream.Handle[Pure, A], encoder: StreamEncoder[A]): Pull[Pure, BitVector, (Stream.Handle[Pure, A], Option[StreamEncoder[A]])] = {
-      encoder.step(h) flatMap {
-        case (h1, next) => go(h1.asInstanceOf[Stream.Handle[Pure, A]], next)
-      }
+    def substStep(s: Step[A]): Stream.Handle[F, A] => Pull[F, BitVector, (Stream.Handle[F, A], StreamEncoder[A])] =
+      Sub1.subst[({type f[g[_],x] = Stream.Handle[g,x] => Pull[g, BitVector, (Stream.Handle[g,x], StreamEncoder[A])]})#f, Pure, F, A](s)
+
+    def go(h: Stream.Handle[F, A], encoder: StreamEncoder[A]): Pull[F, BitVector, (Stream.Handle[F, A], Option[StreamEncoder[A]])] = {
+      substStep(encoder.step)(h) flatMap { case (h1, next) => go(h1, next) }
     }
-    in.open.flatMap(h => go(h.asInstanceOf[Stream.Handle[Pure, A]], this).covary[F]).run
+    in.open.flatMap(h => go(h, this).covary[F]).run
   }
 
   /** Modify the `Pull` backing this `StreamEncoder`. */
