@@ -23,7 +23,7 @@ OsgiKeys.exportPackage := Seq("scodec.stream.*;version=${Bundle-Version}")
 
 OsgiKeys.importPackage := Seq(
   """scala.*;version="$<range;[==,=+);$<@>>"""",
-  """scalaz.*;version="$<range;[==,=+);$<@>>"""",
+  """fs2.*;version="$<range;[==,=+);$<@>>"""",
   """scodec.*;version="$<range;[==,=+);$<@>>"""",
   "*"
 )
