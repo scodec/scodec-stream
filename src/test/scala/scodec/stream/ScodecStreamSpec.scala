@@ -2,7 +2,7 @@ package scodec.stream
 
 import org.scalacheck._
 import Prop._
-import fs2.Stream
+import fs2.{ Strategy, Stream }
 import fs2.util.Task
 import scodec.bits.BitVector
 import scodec.{ Attempt, Decoder, Err }
@@ -127,12 +127,11 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
     }
   }
 
-  // TODO
-  // property("toLazyBitVector") = {
-  //   forAll { (ints: List[Int]) =>
-  //     val bvs = ints.map { i => int32.encode(i).require }
-  //     toLazyBitVector(Stream.emits(bvs)) == bvs.foldLeft(BitVector.empty) { _ ++ _ }
-  //   }
-  // }
+  property("toLazyBitVector") = {
+    forAll { (ints: List[Int]) =>
+      val bvs = ints.map { i => int32.encode(i).require }
+      toLazyBitVector(Stream.emits(bvs))(Strategy.sequential) == bvs.foldLeft(BitVector.empty) { _ ++ _ }
+    }
+  }
 }
 

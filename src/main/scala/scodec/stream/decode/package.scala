@@ -50,7 +50,7 @@ package object decode {
 
   /** Advance the input by the given number of bits, purely as an effect. */
   def advance(n: Long): StreamDecoder[Nothing] =
-    drop(n).edit(s => Stream.drain(s)) // TODO
+    drop(n).edit(_.drain)
 
   /** Set the current cursor to the given `BitVector`. */
   def set(bits: BitVector): StreamDecoder[Nothing] =
@@ -74,7 +74,7 @@ package object decode {
     ask.map(Box(_)).flatMap { bits =>
       val rem = bits.get.drop(numberOfBits) // advance cursor right away
       bits.clear()                          // then clear the reference to bits to allow gc
-      take(numberOfBits).edit(s => Stream.drain(s)) ++ d ++ set(rem) // TODO
+      take(numberOfBits).edit(_.drain) ++ d ++ set(rem)
     }
 
   /**
