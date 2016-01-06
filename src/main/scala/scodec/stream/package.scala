@@ -1,8 +1,7 @@
 package scodec
 
 import fs2._
-import fs2.util.{ Monad, Task }
-import fs2.async.AsyncExt
+import fs2.util.Task
 import fs2.async.mutable.Queue
 
 import scodec.bits.BitVector
@@ -17,7 +16,7 @@ package object stream {
   type StreamCodec[A] = scodec.stream.codec.StreamCodec[A]
   val StreamCodec = scodec.stream.codec.StreamCodec
 
-  /** Constructs a lazy `BitVector` by continuously reading from the supplied process until it halts. */
+  /** Constructs a lazy `BitVector` by continuously reading from the supplied stream until it halts. */
   def toLazyBitVector(in: Stream[Task, BitVector], bufferSize: Int = 100)(implicit strategy: Strategy): BitVector = {
     val queue = Queue.bounded[Task, Option[BitVector]](bufferSize).run
 

@@ -20,7 +20,7 @@ trait StreamEncoder[A] {
    * in the event of an encoding error.
    */
   def encodeAllValid(in: Seq[A]): BitVector =
-    encode(Process.emits(in)).covary[Task].runFold(BitVector.empty)(_ ++ _).run.run
+    encode(Stream.emits(in)).covary[Task].runFold(BitVector.empty)(_ ++ _).run.run
 
   /** Encode the input stream of `A` values using this `StreamEncoder`. */
   final def encode[F[_]](in: Stream[F, A]): Stream[F, BitVector] = {
