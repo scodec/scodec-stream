@@ -6,9 +6,7 @@ import scodec._
 import scodec.stream._
 import scodec.stream.decode.DecodingError
 
-import scalaz.std.AllInstances._
-import scalaz.stream.Process
-import scalaz.concurrent.Task
+import fs2._
 
 import java.io.{ File, FileInputStream }
 
@@ -22,11 +20,11 @@ object Mpeg extends App {
         decode.many(pcapRecord(header.ordering))
       }
 
-    val mpegPcapDecoder: StreamDecoder[MpegPacket] = pcapRecordStreamDecoder flatMapP { record =>
+    val mpegPcapDecoder: StreamDecoder[MpegPacket] = pcapRecordStreamDecoder flatMapS { record =>
       // Drop 22 byte ethernet frame header and 20 byte IPv4/udp header
       val datagramPayloadBits = record.data.drop(22 * 8).drop(20 * 8)
       val packets = codecs.vector(Codec[MpegPacket]).decode(datagramPayloadBits).map { _.value }
-      Process.emitAll(packets.getOrElse(Seq.empty))
+      Stream.emits(packets.getOrElse(Seq.empty))
     }
 
     mpegPcapDecoder
@@ -52,8 +50,8 @@ object Mpeg extends App {
     result
   }
   def channel = new FileInputStream(new File("path/to/file")).getChannel
-  val result2 = time("coarse-grained") { streamThroughRecordsOnly.decodeMmap(channel).runFoldMap(_ => 1).run }
-  val result1 = time("fine-grained") { streamier.decodeMmap(channel).runFoldMap(_ => 1).run }
+  val result2 = time("coarse-grained") { streamThroughRecordsOnly.decodeMmap(channel).runFold(0)((acc, _) => acc + 1).run.run }
+  val result1 = time("fine-grained") { streamier.decodeMmap(channel).runFold(0)((acc, _) => acc + 1).run.run }
   println("fine-grained stream packet count: " + result1)
   println("coarse-grained stream packet count: " + result2)
 }

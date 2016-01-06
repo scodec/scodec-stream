@@ -7,11 +7,9 @@ contributors ++= Seq(Contributor("mpilquist", "Michael Pilquist"), Contributor("
 
 rootPackage := "scodec.stream"
 
-resolvers += "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"
-
 libraryDependencies ++= Seq(
   "org.scodec" %% "scodec-core" % "1.8.3",
-  "org.scalaz.stream" %% "scalaz-stream" % "0.8",
+  "fs2" %% "fs2-core" % "0.9-6f7fb67",
   "org.scalacheck" %% "scalacheck" % "1.11.3" % "test"
 )
 
@@ -23,7 +21,9 @@ OsgiKeys.exportPackage := Seq("scodec.stream.*;version=${Bundle-Version}")
 
 OsgiKeys.importPackage := Seq(
   """scala.*;version="$<range;[==,=+);$<@>>"""",
-  """scalaz.*;version="$<range;[==,=+);$<@>>"""",
+  """fs2.*;version="$<range;[==,=+);$<@>>"""",
   """scodec.*;version="$<range;[==,=+);$<@>>"""",
   "*"
 )
+
+scalacOptions := Nil

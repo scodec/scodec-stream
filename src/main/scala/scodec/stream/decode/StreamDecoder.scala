@@ -2,13 +2,12 @@ package scodec.stream.decode
 
 import java.io.InputStream
 import java.nio.channels.{FileChannel, ReadableByteChannel}
+import fs2._
+import Step.#:
+import fs2.util.{ ~>, Task }
 import scala.util.control.NonFatal
-import scalaz.{~>,\/,MonadPlus}
-import scalaz.stream.{Process,Process1,process1,Tee}
-import scalaz.concurrent.Task
 import scodec.{ Attempt, Decoder, DecodeResult, Err }
 import scodec.bits.BitVector
-
 import shapeless.Lazy
 
 /**
@@ -22,10 +21,10 @@ trait StreamDecoder[+A] { self =>
   import scodec.stream.{decode => D}
 
   /**
-   * The `Process` backing this `StreamDecoder`. All functions on `StreamDecoder`
-   * are defined in terms of this `Process.
+   * The `Stream` backing this `StreamDecoder`. All functions on `StreamDecoder`
+   * are defined in terms of this `Stream`.
    */
-  def decoder: Process[Cursor,A]
+  def decoder: Stream[Cursor,A]
 
   /**
    * Decode the given `BitVector`, returning a strict `Vector` of
@@ -33,14 +32,14 @@ trait StreamDecoder[+A] { self =>
    * decoding error.
    */
   def decodeAllValid(bits: => BitVector): Vector[A] =
-    decode(bits).chunkAll.runLastOr(Vector()).run
+    decode(bits).runLog.run.run
 
   /**
    * Decoding a stream of `A` values from the given `BitVector`.
    * This function does not retain a reference to `bits`, allowing
    * it to be be garbage collected as the returned stream is traversed.
    */
-  final def decode(bits: => BitVector): Process[Task,A] = Process.suspend {
+  final def decode(bits: => BitVector): Stream[Task,A] = Stream.suspend {
     @volatile var cur = bits // am pretty sure this doesn't need to be volatile, but just being safe
     decoder.translate(new (Cursor ~> Task) {
       def apply[X](c: Cursor[X]): Task[X] = Task.suspend {
@@ -55,61 +54,64 @@ trait StreamDecoder[+A] { self =>
   /**
    * Resource-safe version of `decode`. Acquires a resource,
    * decodes a stream of values, and releases the resource when
-   * the returned `Process[Task,A]` is finished being consumed.
+   * the returned `Stream[Task,A]` is finished being consumed.
    * The `acquire` and `release` actions may be asynchronous.
    */
   final def decodeAsyncResource[R](acquire: Task[R])(
       read: R => BitVector,
-      release: R => Task[Unit]): Process[Task,A] =
-    Process.eval(acquire).flatMap { r =>
-      decode(read(r)) onComplete { Process.eval_(release(r)) }
-    }
+      release: R => Task[Unit]): Stream[Task,A] = {
+    Stream.bracket(acquire)(read andThen { b => decode(b) }, release)
+  }
 
   /**
    * Resource-safe version of `decode`. Acquires a resource,
    * decodes a stream of values, and releases the resource when
-   * the returned `Process[Task,A]` is finished being consumed.
+   * the returned `Stream[Task,A]` is finished being consumed.
    * If the `acquire` and `release` actions are asynchronous, use
    * [[decodeAsyncResource]].
    */
   final def decodeResource[R](acquire: => R)(
       read: R => BitVector,
-      release: R => Unit): Process[Task,A] =
+      release: R => Unit): Stream[Task,A] =
     decodeAsyncResource(Task.delay(acquire))(read, r => Task.delay(release(r)))
 
   /**
    * Resource-safe version of `decode` for an `InputStream` resource.
    * This is just a convenience function which calls [[decodeResource]], using
    * `scodec.bits.BitVector.fromInputStream` as the `read` function, and which
-   * closes `in` after the returned `Process[Task,A]` is consumed.
+   * closes `in` after the returned `Stream[Task,A]` is consumed.
    */
   final def decodeInputStream(
       in: => InputStream,
-      chunkSizeInBytes: Int = 1024 * 1000 * 16): Process[Task,A] =
+      chunkSizeInBytes: Int = 1024 * 1000 * 16): Stream[Task,A] =
     decodeResource(in)(BitVector.fromInputStream(_, chunkSizeInBytes), _.close)
 
   /**
    * Resource-safe version of `decode` for a `ReadableByteChannel` resource.
    * This is just a convenience function which calls [[decodeResource]], using
    * `scodec.bits.BitVector.fromChannel` as the `read` function, and which
-   * closes `in` after the returned `Process[Task,A]` is consumed.
+   * closes `in` after the returned `Stream[Task,A]` is consumed.
    */
   final def decodeChannel(
       in: => ReadableByteChannel,
       chunkSizeInBytes: Int = 1024 * 1000 * 16,
-      direct: Boolean = false): Process[Task,A] =
+      direct: Boolean = false): Stream[Task,A] =
     decodeResource(in)(BitVector.fromChannel(_, chunkSizeInBytes, direct), _.close)
 
   /**
    * Resource-safe version of `decode` for a `ReadableByteChannel` resource.
    * This is just a convenience function which calls [[decodeResource]], using
    * `scodec.bits.BitVector.fromChannel` as the `read` function, and which
-   * closes `in` after the returned `Process[Task,A]` is consumed.
+   * closes `in` after the returned `Stream[Task,A]` is consumed.
    */
   final def decodeMmap(
       in: => FileChannel,
-      chunkSizeInBytes: Int = 1024 * 1000 * 16): Process[Task,A] =
+      chunkSizeInBytes: Int = 1024 * 1000 * 16): Stream[Task,A] =
     decodeResource(in)(BitVector.fromMmap(_, chunkSizeInBytes), _.close)
+
+  /** Modify the `Stream[Cursor,A]` backing this `StreamDecoder`. */
+  final def edit[B](f: Stream[Cursor, A] => Stream[Cursor, B]): StreamDecoder[B] =
+    StreamDecoder.instance { f(decoder) }
 
   /**
    * Run this `StreamDecoder`, then `d`, then concatenate the two streams.
@@ -117,22 +119,18 @@ trait StreamDecoder[+A] { self =>
   final def ++[A2>:A](d: => StreamDecoder[A2]): StreamDecoder[A2] =
     edit { _ ++ d.decoder }
 
-  /** Modify the `Process[Cursor,A]` backing this `StreamDecoder`. */
-  final def edit[B](f: Process[Cursor,A] => Process[Cursor,B]): StreamDecoder[B] =
-    StreamDecoder.instance { f(decoder) }
-
   /**
    * Monadic bind for this `StreamDecoder`. Runs a stream decoder for each `A`
    * produced by this `StreamDecoder`, then concatenates all the resulting
    * streams of results. This is the same 'idea' as `List.flatMap`.
    */
   final def flatMap[B](f: A => StreamDecoder[B]): StreamDecoder[B] =
-    flatMapP(f andThen (_.decoder))
+    flatMapS(f andThen (_.decoder))
 
   /**
-   * Like `flatMap`, but takes a function that produces a `Process[Cursor,B]`.
+   * Like `flatMap`, but takes a function that produces a `Stream[Cursor,B]`.
    */
-  final def flatMapP[B](f: A => Process[Cursor,B]): StreamDecoder[B] =
+  final def flatMapS[B](f: A => Stream[Cursor, B]): StreamDecoder[B] =
     edit { _ flatMap f }
 
   /** Alias for `decode.isolate(numberOfBits)(this)`. */
@@ -141,12 +139,10 @@ trait StreamDecoder[+A] { self =>
   /** Alias for `decode.isolateBytes(numberOfBytes)(this)`. */
   def isolateBytes(numberOfBytes: Long): StreamDecoder[A] = D.isolateBytes(numberOfBytes)(this)
 
-  /**
-   * Run this `StreamDecoder` zero or more times until the input is exhausted.
-   */
+  /** Run this `StreamDecoder` zero or more times until the input is exhausted. */
   def many: StreamDecoder[A] = {
     lazy val go: StreamDecoder[A] = D.ask.flatMap { bits =>
-      if (bits.isEmpty) D.halt
+      if (bits.isEmpty) D.empty
       else this ++ go
     }
     go
@@ -174,7 +170,7 @@ trait StreamDecoder[+A] { self =>
    * Transform the output of this `StreamDecoder`, converting left values
    * to decoding failures.
    */
-  final def mapEither[B](f: A => Err \/ B): StreamDecoder[B] =
+  final def mapEither[B](f: A => Either[Err, B]): StreamDecoder[B] =
     this.flatMap { a => f(a).fold(D.fail, D.emit) }
 
   /**
@@ -182,10 +178,13 @@ trait StreamDecoder[+A] { self =>
    * otherwise runs `p` as normal.
    */
   def nonEmpty(errIfEmpty: Err): StreamDecoder[A] =
-    pipe {
-      Process.receive1Or[A, A](
-        Process.fail(DecodingError(errIfEmpty))
-      )(Process.emit).flatMap(process1.shiftRight(_))
+    pipe { s =>
+      s.open.flatMap { h =>
+        Pull.awaitOption(h).flatMap {
+          case None => Pull.fail(DecodingError(errIfEmpty))
+          case Some(a #: h1) => Pull.output(a) >> Pull.echo(h1)
+        }
+      }.run
     }
 
   /**
@@ -205,10 +204,10 @@ trait StreamDecoder[+A] { self =>
   /**
    * Run this `StreamDecoder`, then `d`, then concatenate the two streams,
    * even if `this` halts with an error. The error will be reraised when
-   * `d` completes. See `scalaz.stream.Process.onComplete`.
+   * `d` completes. See `fs2.Stream.onComplete`.
    */
   final def onComplete[A2>:A](d: => StreamDecoder[A2]): StreamDecoder[A2] =
-    edit { _ onComplete d.decoder }
+    edit { s => Stream.onComplete(s, d.decoder) }
 
   /**
    * Transform the output of this `StreamDecoder` using the given
@@ -226,7 +225,17 @@ trait StreamDecoder[+A] { self =>
    * and decoding `B` values which are ignored.
    */
   def sepBy[B](implicit B: Lazy[Decoder[B]]): StreamDecoder[A] =
-    tee(D.many[B])((Process.awaitL[A] fby Process.awaitR[B].drain).repeat)
+    tee(D.many[B]) { (value, delimiter) =>
+      value.pull2(delimiter) { (valueHandle, delimiterHandle) =>
+        def decodeValue(vh: Stream.Handle[Pure, A], dh: Stream.Handle[Pure, B]): Pull[Pure, A, Nothing] = {
+          vh.receive1 { case v #: vh1 => Pull.output1(v) >> decodeDelimiter(vh1, dh) }
+        }
+        def decodeDelimiter(vh: Stream.Handle[Pure, A], dh: Stream.Handle[Pure, B]): Pull[Pure, A, Nothing] = {
+          dh.receive1 { case d #: dh1 => decodeValue(vh, dh1) }
+        }
+        decodeValue(valueHandle, delimiterHandle)
+      }
+    }
 
   /** Decode at most `n` values using this `StreamDecoder`. */
   def take(n: Int): StreamDecoder[A] =
@@ -275,7 +284,7 @@ trait StreamDecoder[+A] { self =>
   final def strict: Decoder[Vector[A]] = new Decoder[Vector[A]] {
     def decode(bits: BitVector) = {
       try {
-        val result = (self ++ D.ask).decode(bits).chunkAll.runLastOr(Vector.empty).run
+        val result = (self ++ D.ask).decode(bits).runLog.run.run
         val as = result.init.asInstanceOf[Vector[A]]
         val remainder = result.last.asInstanceOf[BitVector]
         Attempt.successful(DecodeResult(as, remainder))
@@ -289,20 +298,11 @@ trait StreamDecoder[+A] { self =>
 
 object StreamDecoder {
 
-  /** Create a `StreamDecoder[A]` from a `Process[Cursor,A]`. */
-  def instance[A](d: Process[Cursor,A]): StreamDecoder[A] = new StreamDecoder[A] {
+  /** Create a `StreamDecoder[A]` from a `Stream[Cursor,A]`. */
+  def instance[A](d: Stream[Cursor,A]): StreamDecoder[A] = new StreamDecoder[A] {
     def decoder = d
   }
 
   /** Conjure up a `StreamDecoder[A]` from implicit scope. */
   def apply[A](implicit A: StreamDecoder[A]): StreamDecoder[A] = A
-
-  /** `MonadPlus` instance for `StreamDecoder`. The `plus` operation is `++`. */
-  implicit val instance = new MonadPlus[StreamDecoder] {
-    def point[A](a: => A) = emit(a)
-    def bind[A,B](a: StreamDecoder[A])(f: A => StreamDecoder[B]) =
-      a flatMap f
-    def empty[A] = halt
-    def plus[A](d1: StreamDecoder[A], d2: => StreamDecoder[A]) = d1 ++ d2
-  }
 }
