@@ -17,7 +17,7 @@ import shapeless.Lazy
 package object decode {
 
   /** The decoder that consumes no input and emits no values. */
-  val halt: StreamDecoder[Nothing] =
+  val empty: StreamDecoder[Nothing] =
     StreamDecoder.instance { Stream.empty }
 
   /** The decoder that consumes no input and halts with the given error. */
@@ -102,7 +102,7 @@ package object decode {
    */
   def tryOnce[A](implicit A: Lazy[Decoder[A]]): StreamDecoder[A] = ask flatMap { in =>
     A.value.decode(in).fold(
-      _ => halt,
+      _ => empty,
       { result => set(result.remainder) ++ emit(result.value) }
     )
   }
@@ -152,7 +152,7 @@ package object decode {
    */
   def tryMany[A](implicit A: Lazy[Decoder[A]]): StreamDecoder[A] =
     tryOnce(A).map(Some(_)).or(emit(None)).flatMap {
-      case None => halt
+      case None => empty
       case Some(a) => emit(a) ++ tryMany[A]
     }
 
@@ -174,11 +174,11 @@ package object decode {
           )
         }
         set(cur) ++ {
-          if (buf.nonEmpty) StreamDecoder.instance { Stream.emitAll(buf) } ++ tryManyChunked(chunkSize)
-          else halt
+          if (buf.nonEmpty) StreamDecoder.instance { Stream.emits(buf) } ++ tryManyChunked(chunkSize)
+          else empty
         }
       }
-      catch { case e: DecodingError => halt }
+      catch { case e: DecodingError => empty }
     }
 
   /**
@@ -226,8 +226,8 @@ package object decode {
         )
       }
       set(cur) ++ {
-        if (buf.nonEmpty) StreamDecoder.instance { Stream.emitAll(buf) } ++ manyChunked(chunkSize)
-        else halt
+        if (buf.nonEmpty) StreamDecoder.instance { Stream.emits(buf) } ++ manyChunked(chunkSize)
+        else empty
       }
     }
 

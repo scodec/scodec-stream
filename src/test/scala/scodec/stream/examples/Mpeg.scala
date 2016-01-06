@@ -20,7 +20,7 @@ object Mpeg extends App {
         decode.many(pcapRecord(header.ordering))
       }
 
-    val mpegPcapDecoder: StreamDecoder[MpegPacket] = pcapRecordStreamDecoder flatMapP { record =>
+    val mpegPcapDecoder: StreamDecoder[MpegPacket] = pcapRecordStreamDecoder flatMapS { record =>
       // Drop 22 byte ethernet frame header and 20 byte IPv4/udp header
       val datagramPayloadBits = record.data.drop(22 * 8).drop(20 * 8)
       val packets = codecs.vector(Codec[MpegPacket]).decode(datagramPayloadBits).map { _.value }

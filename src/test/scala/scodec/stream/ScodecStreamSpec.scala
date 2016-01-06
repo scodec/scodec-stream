@@ -44,7 +44,7 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
     var cleanedUp = false
     val dec: StreamDecoder[Int] = D.many1(int32)
       .flatMap { _ => D.fail(Err("oh noes!")) }
-      .onComplete { D.suspend { cleanedUp = true; D.halt }}
+      .onComplete { D.suspend { cleanedUp = true; D.empty }}
     cleanedUp == false &&
     dec.decode(bits).runFold(())((_, _) => ()).run.attemptRun.isLeft
   }
@@ -60,8 +60,8 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
 
   property("or") = forAll { (ints: List[Int]) =>
     val bits = E.many(int32).encodeAllValid(ints.toIndexedSeq)
-    val p1 = D.once(int32).many.or(D.halt)
-    val p2 = D.halt.or(D.many(int32))
+    val p1 = D.once(int32).many.or(D.empty)
+    val p2 = D.empty.or(D.many(int32))
     val p3 = D.once(int32).many | D.once(int32).many
     val p4 = p3 or p1
     def fail(err: Err): Decoder[Nothing] = new Decoder[Nothing] {
