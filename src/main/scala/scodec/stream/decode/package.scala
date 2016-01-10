@@ -182,21 +182,21 @@ package object decode {
     }
 
   /**
-   * Runs `p1`, then runs `p2` if `p1` emits no elements.
+   * Runs `s1`, then runs `s2` if `s1` emits no elements.
    * Example: `or(tryOnce(codecs.int32), once(codecs.uint32))`.
    * This function does no backtracking of its own; backtracking
-   * should be handled by `p1`.
+   * should be handled by `s1`.
    */
-  def or[A](p1: StreamDecoder[A], p2: StreamDecoder[A]) =
-    p1.edit { p1 => orImpl(p1, p2.decoder) }
+  def or[A](s1: StreamDecoder[A], s2: StreamDecoder[A]) =
+    s1.edit { s1 => orImpl(s1, s2.decoder) }
 
-  // generic combinator, this could be added to scalaz-stream
-  private def orImpl[F[_],A](p1: Stream[F,A], p2: Stream[F,A]): Stream[F,A] = {
-    p1.pull2(p2)((p1,p2) =>
-      (p1.awaitNonempty.map(Some(_)) or Pull.pure(None)).flatMap {
-        case None => Pull.echo(p2)
-        case Some(hd #: p1) =>
-          Pull.output(hd) >> Pull.echo(p1)
+  // generic combinator, this could be added to fs2
+  private def orImpl[F[_],A](s1: Stream[F,A], s2: Stream[F,A]): Stream[F,A] = {
+    s1.pull2(s2)((h1,h2) =>
+      (h1.awaitNonempty.map(Some(_)) or Pull.pure(None)).flatMap {
+        case None => Pull.echo(h2)
+        case Some(hd #: h1) =>
+          Pull.output(hd) >> Pull.echo(h1)
       })
   }
 

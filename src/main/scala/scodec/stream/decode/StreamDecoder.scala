@@ -175,7 +175,7 @@ trait StreamDecoder[+A] { self =>
 
   /**
    * Raises a decoding error if the given decoder emits no results,
-   * otherwise runs `p` as normal.
+   * otherwise runs `s` as normal.
    */
   def nonEmpty(errIfEmpty: Err): StreamDecoder[A] =
     pipe { s =>

@@ -51,30 +51,30 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
 
   property("isolate") = forAll { (ints: List[Int]) =>
     val bits = vector(int32).encode(ints.toVector).require
-    val p =
+    val d =
       D.many(int32).isolate(bits.size).map(_ => 0) ++
       D.many(int32).isolate(bits.size).map(_ => 1)
-    val res = p.decode(bits ++ bits).runLog.run.run
+    val res = d.decode(bits ++ bits).runLog.run.run
     res == (Vector.fill(ints.size)(0) ++ Vector.fill(ints.size.toInt)(1))
   }
 
   property("or") = forAll { (ints: List[Int]) =>
     val bits = E.many(int32).encodeAllValid(ints.toIndexedSeq)
-    val p1 = D.once(int32).many.or(D.empty)
-    val p2 = D.empty.or(D.many(int32))
-    val p3 = D.once(int32).many | D.once(int32).many
-    val p4 = p3 or p1
+    val d1 = D.once(int32).many.or(D.empty)
+    val d2 = D.empty.or(D.many(int32))
+    val d3 = D.once(int32).many | D.once(int32).many
+    val d4 = d3 or d1
     def fail(err: Err): Decoder[Nothing] = new Decoder[Nothing] {
       def decode(bits: BitVector) = Attempt.failure(err)
     }
     val failing = D.tryOnce(uint8.flatMap { _ => fail(Err("!!!")) })
     // NB: this fails as expected - since `once` does not backtrack
     // val failing = once(uint8.flatMap { _ => fail("!!!") })
-    val p5 = failing or p1
-    val p6 = p2 or failing
+    val d5 = failing or d1
+    val d6 = d2 or failing
 
-    List(p1,p2,p3,p4,p5,p6).forall { p =>
-      p.decodeAllValid(bits).toList == ints
+    List(d1,d2,d3,d4,d5,d6).forall { d =>
+      d.decodeAllValid(bits).toList == ints
     }
   }
 
