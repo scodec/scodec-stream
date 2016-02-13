@@ -3,6 +3,8 @@ scodecModule := "scodec-stream"
 scodecPrimaryModule
 scodecPrimaryModuleJvm
 
+crossScalaVersions := List(scalaVersion.value)
+
 contributors ++= Seq(Contributor("mpilquist", "Michael Pilquist"), Contributor("pchiusano", "Paul Chiusano"))
 
 rootPackage := "scodec.stream"
