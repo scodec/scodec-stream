@@ -3,10 +3,8 @@ package stream
 
 import language.higherKinds
 
-import scalaz.stream.{ Process, process1, Process1 }
-import scalaz.stream.{ Process => P }
-import scalaz.concurrent.Task
-import scalaz.{ \/, -\/, \/-, Monad, MonadPlus }
+import fs2._
+import fs2.util.Task
 import scodec.bits.BitVector
 
 import shapeless.Lazy
@@ -18,36 +16,36 @@ import shapeless.Lazy
 package object decode {
 
   /** The decoder that consumes no input and emits no values. */
-  val halt: StreamDecoder[Nothing] =
-    StreamDecoder.instance { P.halt }
+  val empty: StreamDecoder[Nothing] =
+    StreamDecoder.instance { Stream.empty }
 
   /** The decoder that consumes no input and halts with the given error. */
   def fail(err: Throwable): StreamDecoder[Nothing] =
-    StreamDecoder.instance { P.fail(err) }
+    StreamDecoder.instance { Stream.fail(err) }
 
   /** The decoder that consumes no input and halts with the given error. */
   def fail(err: Err): StreamDecoder[Nothing] =
-    StreamDecoder.instance { P.fail(DecodingError(err)) }
+    StreamDecoder.instance { Stream.fail(DecodingError(err)) }
 
   /** The decoder that consumes no input, emits the given `a`, then halts. */
   def emit[A](a: A): StreamDecoder[A] =
-    StreamDecoder.instance { P.emit(a) }
+    StreamDecoder.instance { Stream.emit(a) }
 
   /** The decoder that consumes no input, emits the given `A` values, then halts. */
-  def emitAll[A](as: Seq[A]): StreamDecoder[A] =
-    StreamDecoder.instance { Process.emitAll(as) }
+  def emits[A](as: Seq[A]): StreamDecoder[A] =
+    StreamDecoder.instance { Stream.emits(as) }
 
   /** Obtain the current input. This stream returns a single element. */
   def ask: StreamDecoder[BitVector] =
-    StreamDecoder.instance { Process.eval(Cursor.ask) }
+    StreamDecoder.instance { Stream.eval(Cursor.ask) }
 
   /** Modify the current input. This stream returns a single element. */
   def modify(f: BitVector => BitVector): StreamDecoder[BitVector] =
-    StreamDecoder.instance { Process.eval(Cursor.modify(f)) }
+    StreamDecoder.instance { Stream.eval(Cursor.modify(f)) }
 
   /** Advance the input by the given number of bits. */
   def drop(n: Long): StreamDecoder[BitVector] =
-    StreamDecoder.instance { Process.eval(Cursor.modify(_.drop(n))) }
+    StreamDecoder.instance { Stream.eval(Cursor.modify(_.drop(n))) }
 
   /** Advance the input by the given number of bits, purely as an effect. */
   def advance(n: Long): StreamDecoder[Nothing] =
@@ -55,11 +53,11 @@ package object decode {
 
   /** Set the current cursor to the given `BitVector`. */
   def set(bits: BitVector): StreamDecoder[Nothing] =
-    StreamDecoder.instance { Process.eval_(Cursor.set(bits)) }
+    StreamDecoder.instance { Stream.eval_(Cursor.set(bits)) }
 
   /** Trim the input by calling `take(n)` on the input `BitVector`. */
   def take(n: Long): StreamDecoder[BitVector] =
-    StreamDecoder.instance { Process.eval(Cursor.modify(_.take(n))) }
+    StreamDecoder.instance { Stream.eval(Cursor.modify(_.take(n))) }
 
   /** Produce a `StreamDecoder` lazily. */
   def suspend[A](d: => StreamDecoder[A]): StreamDecoder[A] =
@@ -103,7 +101,7 @@ package object decode {
    */
   def tryOnce[A](implicit A: Lazy[Decoder[A]]): StreamDecoder[A] = ask flatMap { in =>
     A.value.decode(in).fold(
-      _ => halt,
+      _ => empty,
       { result => set(result.remainder) ++ emit(result.value) }
     )
   }
@@ -132,15 +130,19 @@ package object decode {
    * of chunk sizes passed to the process.
    */
   def process[A](implicit A: Lazy[Decoder[A]]): Process1[BitVector,A] = {
-    def waiting(leftover: BitVector): Process1[BitVector,A] =
-      P.await1[BitVector] flatMap { bits =>
-        consume(A.value)(leftover ++ bits, Vector.empty) match {
-          case (rem, out, err: Err.InsufficientBits) => P.emitAll(out) ++ waiting(rem)
-          case (rem, Vector(), lastError) => P.fail(DecodingError(lastError))
-          case (rem, out, _) => P.emitAll(out) ++ waiting(rem)
-        }
+
+    def waiting[F[_],I](remainder: BitVector)(h: Stream.Handle[F, BitVector]): Pull[F, A, Stream.Handle[F, BitVector]] = {
+      h.await1.flatMap {
+        case bits #: h =>
+          consume(A.value)(remainder ++ bits, Vector.empty) match {
+            case (rem, out, err: Err.InsufficientBits) => Pull.output(Chunk.seq(out)) >> waiting(rem)(h)
+            case (rem, Vector(), lastError) => Pull.fail(DecodingError(lastError))
+            case (rem, out, _) => Pull.output(Chunk.seq(out)) >> waiting(rem)(h)
+          }
       }
-    waiting(BitVector.empty)
+    }
+
+    _ pull waiting(BitVector.empty)
   }
 
   /**
@@ -149,7 +151,7 @@ package object decode {
    */
   def tryMany[A](implicit A: Lazy[Decoder[A]]): StreamDecoder[A] =
     tryOnce(A).map(Some(_)).or(emit(None)).flatMap {
-      case None => halt
+      case None => empty
       case Some(a) => emit(a) ++ tryMany[A]
     }
 
@@ -171,33 +173,30 @@ package object decode {
           )
         }
         set(cur) ++ {
-          if (buf.nonEmpty) StreamDecoder.instance { P.emitAll(buf) } ++ tryManyChunked(chunkSize)
-          else halt
+          if (buf.nonEmpty) StreamDecoder.instance { Stream.emits(buf) } ++ tryManyChunked(chunkSize)
+          else empty
         }
       }
-      catch { case e: DecodingError => halt }
+      catch { case e: DecodingError => empty }
     }
 
   /**
-   * Runs `p1`, then runs `p2` if `p1` emits no elements.
+   * Runs `s1`, then runs `s2` if `s1` emits no elements.
    * Example: `or(tryOnce(codecs.int32), once(codecs.uint32))`.
    * This function does no backtracking of its own; backtracking
-   * should be handled by `p1`.
+   * should be handled by `s1`.
    */
-  def or[A](p1: StreamDecoder[A], p2: StreamDecoder[A]) =
-    p1.edit { p1 => orImpl(p1, p2.decoder) }
+  def or[A](s1: StreamDecoder[A], s2: StreamDecoder[A]) =
+    s1.edit { s1 => orImpl(s1, s2.decoder) }
 
-  // generic combinator, this could be added to scalaz-stream
-  private def orImpl[F[_],A](p: Process[F,A], p2: Process[F,A]): Process[F,A] = {
-    // emit a single `None` if `p` is empty, otherwise wrap outputs in `Some`
-    val terminated = p |> process1.awaitOption[A].flatMap {
-      case None => P.emit(None)
-      case Some(a) => process1.shiftRight(a).map(Some(_))
-    }
-    terminated.flatMap {
-      case None => p2 // if there's a `None`, `p` must have been empty, switch to `p2`
-      case Some(a) => P.emit(a) // if there's a `Some`, `p` nonempty, so ignore `p2`
-    }
+  // generic combinator, this could be added to fs2
+  private def orImpl[F[_],A](s1: Stream[F,A], s2: Stream[F,A]): Stream[F,A] = {
+    s1.pull2(s2)((h1,h2) =>
+      (h1.awaitNonempty.map(Some(_)) or Pull.pure(None)).flatMap {
+        case None => Pull.echo(h2)
+        case Some(hd #: h1) =>
+          Pull.output(hd) >> Pull.echo(h1)
+      })
   }
 
   /**
@@ -226,8 +225,8 @@ package object decode {
         )
       }
       set(cur) ++ {
-        if (buf.nonEmpty) StreamDecoder.instance { P.emitAll(buf) } ++ manyChunked(chunkSize)
-        else halt
+        if (buf.nonEmpty) StreamDecoder.instance { Stream.emits(buf) } ++ manyChunked(chunkSize)
+        else empty
       }
     }
 

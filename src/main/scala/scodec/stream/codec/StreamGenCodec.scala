@@ -1,10 +1,10 @@
 package scodec.stream
 package codec
 
-import scalaz.stream.Process1
+import fs2._
 import scodec.bits.BitVector
 
-trait StreamGenCodec[-I,+O] extends StreamEncoder[I] with StreamDecoder[O] { self =>
+trait StreamGenCodec[I,+O] extends StreamEncoder[I] with StreamDecoder[O] { self =>
 
   def editEncoder[I2](f: StreamEncoder[I] => StreamEncoder[I2]): StreamGenCodec[I2,O] =
     StreamGenCodec.instance(f(this), this)
@@ -23,8 +23,8 @@ trait StreamGenCodec[-I,+O] extends StreamEncoder[I] with StreamDecoder[O] { sel
       StreamDecoder.instance(decoder).many)
 
   /** Promote to a `StreamCodec[O]` given evidence that `I` and `O` are equal. */
-  def fuse[II <: I, OO >: O](implicit ev: OO =:= II): StreamCodec[OO] = new StreamCodec[OO] {
-    def encoder = (self.encoder: Process1[II,BitVector]).asInstanceOf[Process1[OO,BitVector]]
+  def fuse[I, OO >: O](implicit ev: OO =:= I): StreamCodec[OO] = new StreamCodec[OO] {
+    def encoder = self.encoder.asInstanceOf[StreamEncoder.Step[OO]]
     def decoder = self.decoder
   }
 }
