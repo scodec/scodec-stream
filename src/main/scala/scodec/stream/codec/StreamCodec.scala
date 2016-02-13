@@ -3,7 +3,7 @@ package codec
 
 trait StreamCodec[A] extends StreamGenCodec[A,A] {
 
-  override def take(n: Int): StreamCodec[A] =
+  override def take(n: Long): StreamCodec[A] =
     StreamCodec.instance(StreamEncoder.instance(encoder).take(n),
                          StreamDecoder.instance(decoder).take(n))
 

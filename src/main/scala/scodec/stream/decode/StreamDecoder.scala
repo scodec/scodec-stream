@@ -237,7 +237,7 @@ trait StreamDecoder[+A] { self =>
     }
 
   /** Decode at most `n` values using this `StreamDecoder`. */
-  def take(n: Int): StreamDecoder[A] =
+  def take(n: Long): StreamDecoder[A] =
     edit { _ take n }
 
   /** Decode values as long as the predicate tests true. */

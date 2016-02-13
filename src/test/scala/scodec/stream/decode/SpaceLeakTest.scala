@@ -13,7 +13,7 @@ object SpaceLeakTest extends Properties("space-leak") {
     // make sure that head of stream can be garbage collected
     // as we go; this also checks for stack safety
     val ints = variableSizeBytes(int32, vector(int32))
-    val N = 400000
+    val N = 400000L
     val M = 5
     val chunk = (0 until M).toVector
     def chunks = BitVector.unfold(0)(_ => Some(ints.encode(chunk).require -> 0))

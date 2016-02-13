@@ -28,4 +28,3 @@ OsgiKeys.importPackage := Seq(
   "*"
 )
 
-scalacOptions := Nil

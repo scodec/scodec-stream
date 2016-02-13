@@ -51,7 +51,7 @@ trait StreamEncoder[A] {
     edit { o => h => o(h.map(g)).map { case (h1, e1) => h1.map(f) -> e1.xmapc(f)(g) }}
 
   /** Encode at most `n` values. */
-  def take(n: Int): StreamEncoder[A] = edit { step => h =>
+  def take(n: Long): StreamEncoder[A] = edit { step => h =>
     if (n <= 0) Pull.done
     else step(h) map { case (h, s2) => (h, s2.take(n-1)) }
   }
