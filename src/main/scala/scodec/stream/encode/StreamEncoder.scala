@@ -7,7 +7,8 @@ import fs2.util.{ Catchable, Sub1, Task }
 import scodec.bits.BitVector
 
 /**
- * A streaming encoding process, represented as a `Pull[Pure, BitVector, StreamEncoder[A]]`.
+ * A streaming encoding process, represented as a `Stream.Handle[Pure, A] => Pull[Pure, BitVector, (Stream.Handle[Pure, A], StreamEncoder[A])]`.
+ * Pull[Pure, BitVector, StreamEncoder[A]]`.
  */
 trait StreamEncoder[A] {
   import StreamEncoder._
@@ -19,7 +20,7 @@ trait StreamEncoder[A] {
    * in the event of an encoding error.
    */
   def encodeAllValid(in: Seq[A]): BitVector =
-    encode(Stream.emits(in)).covary[Task].runFold(BitVector.empty)(_ ++ _).run.run
+    encode(Stream.emits(in)).covary[Task].runFold(BitVector.empty)(_ ++ _).run.unsafeRun
 
   /** Encode the input stream of `A` values using this `StreamEncoder`. */
   final def encode[F[_]](in: Stream[F, A]): Stream[F, BitVector] = {

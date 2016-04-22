@@ -5,7 +5,6 @@ import Prop._
 import scodec.Codec
 import scodec.codecs._
 import scodec.bits.BitVector
-import fs2._
 
 object SpaceLeakTest extends Properties("space-leak") {
 
@@ -19,9 +18,9 @@ object SpaceLeakTest extends Properties("space-leak") {
     def chunks = BitVector.unfold(0)(_ => Some(ints.encode(chunk).require -> 0))
     val dec = many(ints).take(N).
       flatMap(chunk => emits(chunk)).
-      pipe(process1.sum)
+      through(fs2.pipe.sum)
 
     val r = dec.decode(chunks)
-    r.runFold(0)((_, last) => last).run.run == (0 until M).sum * N
+    r.runFold(0)((_, last) => last).run.unsafeRun == (0 until M).sum * N
   }
 }

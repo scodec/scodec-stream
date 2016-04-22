@@ -115,7 +115,7 @@ package object decode {
     }
 
   /**
-   * Promote a decoder to a `Process1`. The returned `Process1` may be
+   * Promote a decoder to a `Pipe[F, BitVector, A`. The returned pipe may be
    * given chunks larger or smaller than what is needed to decode a single
    * element, and will buffer any unconsumed input, but a decoding error
    * will result if the decoder fails for a reason other than `Err.InsufficientBits`.
@@ -129,9 +129,9 @@ package object decode {
    * satisfying this property will make results highly dependent on the sequence
    * of chunk sizes passed to the process.
    */
-  def process[A](implicit A: Lazy[Decoder[A]]): Process1[BitVector,A] = {
+  def pipe[F[_], A](implicit A: Lazy[Decoder[A]]): Pipe[F, BitVector, A] = {
 
-    def waiting[F[_],I](remainder: BitVector)(h: Stream.Handle[F, BitVector]): Pull[F, A, Stream.Handle[F, BitVector]] = {
+    def waiting[I](remainder: BitVector)(h: Stream.Handle[F, BitVector]): Pull[F, A, Stream.Handle[F, BitVector]] = {
       h.await1.flatMap {
         case bits #: h =>
           consume(A.value)(remainder ++ bits, Vector.empty) match {
