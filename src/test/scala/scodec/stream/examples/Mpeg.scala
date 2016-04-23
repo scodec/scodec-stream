@@ -50,8 +50,8 @@ object Mpeg extends App {
     result
   }
   def channel = new FileInputStream(new File("path/to/file")).getChannel
-  val result2 = time("coarse-grained") { streamThroughRecordsOnly.decodeMmap(channel).runFold(0)((acc, _) => acc + 1).run.run }
-  val result1 = time("fine-grained") { streamier.decodeMmap(channel).runFold(0)((acc, _) => acc + 1).run.run }
+  val result2 = time("coarse-grained") { streamThroughRecordsOnly.decodeMmap(channel).runFold(0)((acc, _) => acc + 1).run.unsafeRun }
+  val result1 = time("fine-grained") { streamier.decodeMmap(channel).runFold(0)((acc, _) => acc + 1).run.unsafeRun }
   println("fine-grained stream packet count: " + result1)
   println("coarse-grained stream packet count: " + result2)
 }

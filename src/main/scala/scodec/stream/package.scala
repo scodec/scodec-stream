@@ -18,11 +18,11 @@ package object stream {
 
   /** Constructs a lazy `BitVector` by continuously reading from the supplied stream until it halts. */
   def toLazyBitVector(in: Stream[Task, BitVector], bufferSize: Int = 100)(implicit strategy: Strategy): BitVector = {
-    val queue = Queue.bounded[Task, Option[BitVector]](bufferSize).run
+    val queue = Queue.bounded[Task, Option[BitVector]](bufferSize).unsafeRun
 
     val fill: Task[Unit] = in.map(Some(_)).onComplete(Stream.emit(None)).evalMap(queue.enqueue1).run.run
-    fill.runAsync(_ => ())
+    fill.unsafeRunAsync(_ => ())
 
-    BitVector.unfold(()) { _ => queue.dequeue1.run.map { b => (b, ()) } }
+    BitVector.unfold(()) { _ => queue.dequeue1.unsafeRun.map { b => (b, ()) } }
   }
 }

@@ -1,7 +1,7 @@
 scodec-stream
 =============
 
-Scodec-stream is a library for streaming binary encoding and decoding. It is built atop [scodec](https://github.com/scodec/scodec) and [scalaz-stream][]. Here's a brief example of its use:
+Scodec-stream is a library for streaming binary encoding and decoding. It is built atop [scodec](https://github.com/scodec/scodec) and [fs2][]. Here's a brief example of its use:
 
 ```Scala
 import scodec.{codecs => C}
@@ -12,11 +12,11 @@ val frames: StreamDecoder[ByteVector] = D.once(C.int32)
  .flatMap { numBytes => D.once(C.bytes(numBytes)).isolate(numBytes) }
  .many
 
-val s: Process[scalaz.concurrent.Task, ByteVector] =
+val s: Stream[fs2.util.Task, ByteVector] =
   frames.decodeMmap(new java.io.FileInputStream("largefile.bin").getChannel)
 ```
 
-[scalaz-stream]: https://github.com/scalaz/scalaz-stream
+[scalaz-stream]: https://github.com/functional-streams-for-scala/fs2
 
 When consumed, `s` will memory map in the contents of `"largefile.bin"`, then decode a stream of frames, where each frame is expected to begin with a number of bytes specified as a 32-bit signed int (the `int32` codec), followed by a frame payload of that many bytes. Nothing happens until the `s` stream is consumed, and `s` will ensure the `FileChannel` is closed in the event of an error or normal termination of the consumer. See [the guide](#guide) for further information and discussion of streaming encoding.
 
@@ -66,7 +66,7 @@ The library provides two main types, [`scodec.stream.StreamDecoder[A]`][dec], wi
 
 #### Decoding
 
-The model of a `StreamDecoder[A]` is a `Process[Cursor,A]`, where [`Cursor[X]`][cursor] is a `BitVector => String \/ (BitVector,X)` state action. Thus, a `StreamDecoder[A]` produces a stream of `A` values, using a [`BitVector`](https://github.com/scodec/scodec-bits) input that it may inspect and update as it emits values. The 'current' `BitVector` is sometimes called the 'cursor position' or just 'cursor' throughout this documentation.
+The model of a `StreamDecoder[A]` is a `Stream[Cursor,A]`, where [`Cursor[X]`][cursor] is a `BitVector => Attempt[DecodeResult[X]]` state action. Thus, a `StreamDecoder[A]` produces a stream of `A` values, using a [`BitVector`](https://github.com/scodec/scodec-bits) input that it may inspect and update as it emits values. The 'current' `BitVector` is sometimes called the 'cursor position' or just 'cursor' throughout this documentation.
 
 [cursor]: https://github.com/scodec/scodec-stream/blob/master/src/main/scala/scodec/stream/decode/Cursor.scala
 
@@ -99,7 +99,7 @@ When a `StreamDecoder[A]` advances the cursor, the head of the underlying `BitVe
 
 #### Encoding
 
-The model of a [`StreamEncoder[A]`][enc] is a `Process1[A,BitVector]`, where `Process1` is defined in [scalaz-stream][]. Thus, a `StreamEncoder[A]` receives a stream of `A` values and transforms this stream (possibly statefully) into a stream of `BitVector` chunks. Encoding failures are raised within the `Process1` as a [`EncodingError`][enc-err].
+The model of a [`StreamEncoder[A]`][enc] is a `Stream.Handle[Pure, A] => Pull[Pure, BitVector, (Stream.Handle[Pure, A], StreamEncoder[A])]`. Thus, a `StreamEncoder[A]` receives a stream of `A` values and transforms this stream (possibly statefully) into a stream of `BitVector` chunks. Encoding failures are raised within the pull as a [`EncodingError`][enc-err].
 
 [enc-err]: https://github.com/scodec/scodec-stream/blob/master/src/main/scala/scodec/stream/encode/EncodingError.scala
 
@@ -107,8 +107,7 @@ We are currently still discovering nice combinators for building up `StreamEncod
 
 * `encode.once`: A `scodec.Encoder[A] => StreamEncoder[A]` which encode a single `A` to the output, then halts. For example, `encode.once(codecs)`
 * `encode.many` or `e.many`: A `scodec.Encoder[A] => StreamEncoder[A]` which encodes multiple `A` values to the output, halting only when the input `A` stream is exhausted. Example: `encode.many(codecs.int16)` encodes zero or more integers, each of which is expected to fit within 16 bits.
-* `e1 ++ e2`: Encode values with `e1` until it halts, then encode values with `e2` until it halts. Example: `encode.once(codecs.int32) ++ encode.many(codecs.int16)` encodes one `Int` as a 32-bit signed `Int`, followed by zero or more `Int` values encoded as 16-bit signed ints. (If an input does not fit in 16 bits, an [encoding error][enc-err] is raised within the `Process1`)
-* `e.mapBits(f)` where `f: BitVector => BitVector` and `e.pipeBits(p)`, where `p: Process1[BitVector,BitVector]`: Transform (possibly statefully) the bits output by this encoder. This can be used to accumulate and add framing, among other things. For instance, one might use `pipeBits` to wait for 1024kB to accumulate before emitting a frame consisting of a checksum of the current buffer, the number 1024 indicating the number of bytes in the frame, followed by a frame payload of that many bytes.
+* `e1 ++ e2`: Encode values with `e1` until it halts, then encode values with `e2` until it halts. Example: `encode.once(codecs.int32) ++ encode.many(codecs.int16)` encodes one `Int` as a 32-bit signed `Int`, followed by zero or more `Int` values encoded as 16-bit signed ints. (If an input does not fit in 16 bits, an [encoding error][enc-err] is raised within the pull)
 
 [key]: https://github.com/scodec/scodec-stream/blob/master/src/main/scala/scodec/stream/encode/package.scala
 
@@ -116,14 +115,14 @@ Since encoders only retain references to previously received values if they do s
 
 ##### Running encoders
 
-An `e: StreamEncoder[A]` may be applied to any `s: Process[F,A]` via `e.encode(s)`, which returns a `Process[F,BitVector]` that can be dumped to a file using normal [scalaz-stream][] I/O combinators. We welcome contributions of helper functions for common encoding cases.
+An `e: StreamEncoder[A]` may be applied to any `s: Stream[F,A]` via `e.encode(s)`, which returns a `Stream[F,BitVector]` that can be dumped to a file using normal [fs2][] I/O combinators. We welcome contributions of helper functions for common encoding cases.
 
 The representation of `StreamEncoder` means it can be used to transform the result of a `StreamDecoder`, for instance:
 
 ```Scala
 import scodec.codecs
 import scodec.stream.{encode,decode,StreamDecoder,StreamEncoder}
-import scalaz.concurrent.Task
+import fs2.util.Task
 
 // skip first 64 bits, then decode
 val d: StreamDecoder[Int] = decode.advance(64) ++ decode.many(codecs.int32)
@@ -132,11 +131,11 @@ val e: StreamEncoder[Int] = encode.many(codecs.int16)
 val t: Task[Unit] =
  e.encode { d.decodeMmap(new FileInputStream("largefile.bin").getChannel) }
   .map(_.toByteVector)
-  .to(scalaz.stream.io.fileChunkW("smallerfile.bin"))
-  .run
+  .to(fs2.io.fileChunkW("smallerfile.bin")) // TODO Update this for fs2 when IO module is ready
+  .run.run
 
 // at the end of the universe
-t.run
+t.unsafeRun
 ```
 
-Calling `t.run` will do a streaming decode of the `"largefile.bin"` file, skipping the first 64 bits, then a stream of signed 32 bit ints, which it downsamples to 16 bits and streams to the output file `"smallerfile.bin"`, raising an [`EncodingError`][enc-err] in the event of a format error or if an integer from the input fails to fit within 16 bits.
+Calling `t.unsafeRun` will do a streaming decode of the `"largefile.bin"` file, skipping the first 64 bits, then a stream of signed 32 bit ints, which it downsamples to 16 bits and streams to the output file `"smallerfile.bin"`, raising an [`EncodingError`][enc-err] in the event of a format error or if an integer from the input fails to fit within 16 bits.

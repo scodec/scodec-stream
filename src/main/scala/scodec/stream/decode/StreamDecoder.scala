@@ -1,5 +1,6 @@
 package scodec.stream.decode
 
+import scala.language.higherKinds
 import java.io.InputStream
 import java.nio.channels.{FileChannel, ReadableByteChannel}
 import fs2._
@@ -31,7 +32,7 @@ trait StreamDecoder[+A] { self =>
    * decoding error.
    */
   def decodeAllValid(bits: => BitVector): Vector[A] =
-    decode(bits).runLog.run.run
+    decode(bits).runLog.run.unsafeRun
 
   /**
    * Decoding a stream of `A` values from the given `BitVector`.
@@ -177,7 +178,7 @@ trait StreamDecoder[+A] { self =>
    * otherwise runs `s` as normal.
    */
   def nonEmpty(errIfEmpty: Err): StreamDecoder[A] =
-    pipe { s =>
+    through { s =>
       s.open.flatMap { h =>
         Pull.awaitOption(h).flatMap {
           case None => Pull.fail(DecodingError(errIfEmpty))
@@ -212,19 +213,15 @@ trait StreamDecoder[+A] { self =>
    * Transform the output of this `StreamDecoder` using the given
    * single-input stream transducer.
    */
-  final def pipe[B](p: Process1[A,B]): StreamDecoder[B] =
-    edit { _ pipe p }
-
-  /** Alias for `this pipe p`. */
-  final def |>[B](p: Process1[A,B]): StreamDecoder[B] =
-    pipe(p)
+  final def through[B](p: Pipe[Pure,A,B]): StreamDecoder[B] =
+    edit { _ through p }
 
   /**
    * Alternate between decoding `A` values using this `StreamDecoder`,
    * and decoding `B` values which are ignored.
    */
   def sepBy[B](implicit B: Lazy[Decoder[B]]): StreamDecoder[A] =
-    tee(D.many[B]) { (value, delimiter) =>
+    through2(D.many[B]) { (value, delimiter) =>
       value.pull2(delimiter) { (valueHandle, delimiterHandle) =>
         def decodeValue(vh: Stream.Handle[Pure, A], dh: Stream.Handle[Pure, B]): Pull[Pure, A, Nothing] = {
           vh.receive1 { case v #: vh1 => Pull.output1(v) >> decodeDelimiter(vh1, dh) }
@@ -276,14 +273,14 @@ trait StreamDecoder[+A] { self =>
    * combinator is more useful for expressing alternation between two
    * decoders.
    */
-  final def tee[B,C](d: StreamDecoder[B])(t: Tee[A,B,C]): StreamDecoder[C] =
-    edit { _.tee(d.decoder)(t) }
+  final def through2[B,C](d: StreamDecoder[B])(t: Pipe2[Pure,A,B,C]): StreamDecoder[C] =
+    edit { _.through2(d.decoder)(t) }
 
   /** Create a strict (i.e., non-stream) decoder. */
   final def strict: Decoder[Vector[A]] = new Decoder[Vector[A]] {
     def decode(bits: BitVector) = {
       try {
-        val result = (self ++ D.ask).decode(bits).runLog.run.run
+        val result = (self ++ D.ask).decode(bits).runLog.run.unsafeRun
         val as = result.init.asInstanceOf[Vector[A]]
         val remainder = result.last.asInstanceOf[BitVector]
         Attempt.successful(DecodeResult(as, remainder))
