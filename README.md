@@ -16,7 +16,7 @@ val s: Stream[fs2.util.Task, ByteVector] =
   frames.decodeMmap(new java.io.FileInputStream("largefile.bin").getChannel)
 ```
 
-[scalaz-stream]: https://github.com/functional-streams-for-scala/fs2
+[fs2]: https://github.com/functional-streams-for-scala/fs2
 
 When consumed, `s` will memory map in the contents of `"largefile.bin"`, then decode a stream of frames, where each frame is expected to begin with a number of bytes specified as a 32-bit signed int (the `int32` codec), followed by a frame payload of that many bytes. Nothing happens until the `s` stream is consumed, and `s` will ensure the `FileChannel` is closed in the event of an error or normal termination of the consumer. See [the guide](#guide) for further information and discussion of streaming encoding.
 
