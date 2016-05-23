@@ -28,12 +28,12 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
   property("tryMany-example") = secure {
     val bits = E.many(int32).encodeAllValid(Vector(1,2,3))
     D.tryMany(int32).decodeAllValid(bits).toList == List(1,2,3) &&
-    D.tryMany(int32).decode(bits).runLog.run.unsafeRun.toList == List(1,2,3)
+    D.tryMany(int32).decode(bits).runLog.unsafeRun.toList == List(1,2,3)
   }
 
   property("many1") = forAll { (ints: List[Int]) =>
     val bits = E.many(int32).encodeAllValid(ints)
-    D.many1(int32).decode(bits).runLog.run.unsafeAttemptRun.fold(
+    D.many1(int32).decode(bits).runLog.unsafeAttemptRun.fold(
       err => ints.isEmpty,
       vec => vec.toList == ints
     )
@@ -46,7 +46,7 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
       .flatMap { _ => D.fail(Err("oh noes!")) }
       .onComplete { D.suspend { cleanedUp = true; D.empty }}
     cleanedUp == false &&
-    dec.decode(bits).runFold(())((_, _) => ()).run.unsafeAttemptRun.isLeft
+    dec.decode(bits).runFold(())((_, _) => ()).unsafeAttemptRun.isLeft
   }
 
   property("isolate") = forAll { (ints: List[Int]) =>
@@ -54,7 +54,7 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
     val d =
       D.many(int32).isolate(bits.size).map(_ => 0) ++
       D.many(int32).isolate(bits.size).map(_ => 1)
-    val res = d.decode(bits ++ bits).runLog.run.unsafeRun
+    val res = d.decode(bits ++ bits).runLog.unsafeRun
     res == (Vector.fill(ints.size)(0) ++ Vector.fill(ints.size.toInt)(1))
   }
 
@@ -93,10 +93,10 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
     var cleanedUp = 0
     val decoded = D.many(string).decodeResource(())(_ => bits, _ => cleanedUp += 1)
     cleanedUp == 0 && // make sure we don't bump this strictly
-    decoded.runLog.run.unsafeRun.toList == strings && // normal termination
-    decoded.take(2).runLog.run.unsafeRun.toList == strings.take(2) && // early termination
+    decoded.runLog.unsafeRun.toList == strings && // normal termination
+    decoded.take(2).runLog.unsafeRun.toList == strings.take(2) && // early termination
     { // exceptions
-      val failed = decoded.take(3).map(_ => sys.error("die")).runLog.run.unsafeAttemptRun.isLeft
+      val failed = decoded.take(3).map(_ => sys.error("die")).runLog.unsafeAttemptRun.isLeft
       strings.isEmpty || failed
     } &&
     cleanedUp == 3

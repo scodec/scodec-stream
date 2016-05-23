@@ -21,6 +21,6 @@ object SpaceLeakTest extends Properties("space-leak") {
       through(fs2.pipe.sum)
 
     val r = dec.decode(chunks)
-    r.runFold(0)((_, last) => last).run.unsafeRun == (0 until M).sum * N
+    r.runFold(0)((_, last) => last).unsafeRun == (0 until M).sum * N
   }
 }
