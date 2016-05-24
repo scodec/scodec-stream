@@ -108,10 +108,10 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
     d.decodeAllValid(bits).toList == (strings ++ strings)
   }
 
-  property("process") = {
+  {
     case class Chunk(get: Int)
     implicit val chunkSize = Arbitrary(Gen.choose(1,128).map(Chunk(_)))
-    new Properties("fixed size") {
+    include(new Properties("fixed size") {
       property("strings") = forAll { (strings: List[String], chunkSize: Chunk) =>
         val bits = E.many(string).encodeAllValid(strings)
         val chunks = Stream.emits(bits.grouped(chunkSize.get.toLong)).pure
@@ -122,7 +122,7 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
         val chunks = Stream.emits(bits.grouped(chunkSize.get.toLong)).pure
         (chunks through D.pipe(int32)).toList == ints
       }
-    }
+    }, "process.")
   }
 
   property("toLazyBitVector") = {
