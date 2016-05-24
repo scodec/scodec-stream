@@ -30,7 +30,7 @@ trait StreamEncoder[A] {
     def go(h: Stream.Handle[F, A], encoder: StreamEncoder[A]): Pull[F, BitVector, (Stream.Handle[F, A], Option[StreamEncoder[A]])] = {
       substStep(encoder.encoder)(h) flatMap { case (h1, next) => go(h1, next) }
     }
-    in.open.flatMap(h => go(h, this)).run
+    in.open.flatMap(h => go(h, this)).close
   }
 
   /** Modify the `Pull` backing this `StreamEncoder`. */

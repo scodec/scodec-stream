@@ -184,7 +184,7 @@ trait StreamDecoder[+A] { self =>
           case None => Pull.fail(DecodingError(errIfEmpty))
           case Some(a #: h1) => Pull.output(a) >> Pull.echo(h1)
         }
-      }.run
+      }.close
     }
 
   /**
