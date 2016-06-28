@@ -1,10 +1,9 @@
 package scodec.stream.decode
 
-import scala.language.higherKinds
 import java.io.InputStream
 import java.nio.channels.{FileChannel, ReadableByteChannel}
 import fs2._
-import fs2.util.{ ~>, Task }
+import fs2.util.{ ~> }
 import scala.util.control.NonFatal
 import scodec.{ Attempt, Decoder, DecodeResult, Err }
 import scodec.bits.BitVector

@@ -3,7 +3,7 @@ package scodec.stream.encode
 import language.higherKinds
 
 import fs2._
-import fs2.util.{ Catchable, Sub1, Task }
+import fs2.util.Sub1
 import scodec.bits.BitVector
 
 /**

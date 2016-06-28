@@ -1,7 +1,6 @@
 package scodec
 
 import fs2._
-import fs2.util.Task
 import fs2.async.mutable.Queue
 
 import scodec.bits.BitVector

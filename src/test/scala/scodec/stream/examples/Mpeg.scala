@@ -4,7 +4,6 @@ import scala.concurrent.duration._
 import scodec.bits._
 import scodec._
 import scodec.stream._
-import scodec.stream.decode.DecodingError
 
 import fs2._
 

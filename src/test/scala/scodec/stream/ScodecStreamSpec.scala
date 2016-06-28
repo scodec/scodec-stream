@@ -3,7 +3,6 @@ package scodec.stream
 import org.scalacheck._
 import Prop._
 import fs2.{ Strategy, Stream }
-import fs2.util.Task
 import scodec.bits.BitVector
 import scodec.{ Attempt, Decoder, Err }
 import scodec.codecs._

@@ -2,7 +2,6 @@ package scodec.stream.decode
 
 import org.scalacheck._
 import Prop._
-import scodec.Codec
 import scodec.codecs._
 import scodec.bits.BitVector
 

@@ -4,7 +4,6 @@ package stream
 import language.higherKinds
 
 import fs2._
-import fs2.util.Task
 import scodec.bits.BitVector
 
 import shapeless.Lazy
