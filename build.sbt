@@ -11,7 +11,7 @@ rootPackage := "scodec.stream"
 
 libraryDependencies ++= Seq(
   "org.scodec" %% "scodec-core" % "1.10.2",
-  "co.fs2" %% "fs2-core" % "0.9.0-M6",
+  "co.fs2" %% "fs2-core" % "0.9.0-SNAPSHOT",
   "org.scalacheck" %% "scalacheck" % "1.13.1" % "test"
 )
 

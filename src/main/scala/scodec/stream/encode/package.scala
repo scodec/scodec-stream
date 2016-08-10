@@ -26,12 +26,11 @@ package object encode {
 
   /** A `StreamEncoder` which encodes a single value, then halts. */
   def once[A](implicit A: Lazy[Encoder[A]]): StreamEncoder[A] = StreamEncoder.instance[A] { h =>
-    h.await1.flatMap {
-      case a #: h1 =>
-        A.value.encode(a).fold(
-          e => Pull.fail(EncodingError(e)),
-          b => Pull.output1(b)
-        ) >> Pull.pure(h1 -> empty)
+    h.receive1 { (a, h1) =>
+      A.value.encode(a).fold(
+        e => Pull.fail(EncodingError(e)),
+        b => Pull.output1(b)
+      ) >> Pull.pure(h1 -> empty)
     }
   }
 
@@ -44,12 +43,11 @@ package object encode {
    * Unlike `once`, encoding failures are converted to normal termination.
    */
   def tryOnce[A](implicit A: Lazy[Encoder[A]]): StreamEncoder[A] = StreamEncoder.instance { h =>
-    h.await1.flatMap {
-      case a #: h1 =>
-        A.value.encode(a).fold(
-          e => Pull.pure(h1 -> empty),
-          b => Pull.output1(b) >> Pull.pure(h1 -> empty)
-        )
+    h.receive1 { (a, h1) =>
+      A.value.encode(a).fold(
+        e => Pull.pure(h1 -> empty),
+        b => Pull.output1(b) >> Pull.pure(h1 -> empty)
+      )
     }
   }
 }

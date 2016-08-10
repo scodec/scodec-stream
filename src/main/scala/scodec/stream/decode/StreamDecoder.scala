@@ -179,9 +179,9 @@ trait StreamDecoder[+A] { self =>
   def nonEmpty(errIfEmpty: Err): StreamDecoder[A] =
     through { s =>
       s.open.flatMap { h =>
-        Pull.awaitOption(h).flatMap {
+        h.awaitOption.flatMap {
           case None => Pull.fail(DecodingError(errIfEmpty))
-          case Some(a #: h1) => Pull.output(a) >> Pull.echo(h1)
+          case Some((a, h1)) => Pull.output(a) >> h1.echo
         }
       }.close
     }
@@ -201,14 +201,6 @@ trait StreamDecoder[+A] { self =>
     this.or(d)
 
   /**
-   * Run this `StreamDecoder`, then `d`, then concatenate the two streams,
-   * even if `this` halts with an error. The error will be reraised when
-   * `d` completes. See `fs2.Stream.onComplete`.
-   */
-  final def onComplete[A2>:A](d: => StreamDecoder[A2]): StreamDecoder[A2] =
-    edit { s => Stream.onComplete(s, d.decoder) }
-
-  /**
    * Transform the output of this `StreamDecoder` using the given
    * single-input stream transducer.
    */
@@ -222,11 +214,11 @@ trait StreamDecoder[+A] { self =>
   def sepBy[B](implicit B: Lazy[Decoder[B]]): StreamDecoder[A] =
     through2(D.many[B]) { (value, delimiter) =>
       value.pull2(delimiter) { (valueHandle, delimiterHandle) =>
-        def decodeValue(vh: Stream.Handle[Pure, A], dh: Stream.Handle[Pure, B]): Pull[Pure, A, Nothing] = {
-          vh.receive1 { case v #: vh1 => Pull.output1(v) >> decodeDelimiter(vh1, dh) }
+        def decodeValue(vh: Handle[Pure, A], dh: Handle[Pure, B]): Pull[Pure, A, Nothing] = {
+          vh.receive1 { (v, vh1) => Pull.output1(v) >> decodeDelimiter(vh1, dh) }
         }
-        def decodeDelimiter(vh: Stream.Handle[Pure, A], dh: Stream.Handle[Pure, B]): Pull[Pure, A, Nothing] = {
-          dh.receive1 { case d #: dh1 => decodeValue(vh, dh1) }
+        def decodeDelimiter(vh: Handle[Pure, A], dh: Handle[Pure, B]): Pull[Pure, A, Nothing] = {
+          dh.receive1 { (d, dh1) => decodeValue(vh, dh1) }
         }
         decodeValue(valueHandle, delimiterHandle)
       }

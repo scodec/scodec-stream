@@ -38,16 +38,6 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
     )
   }
 
-  property("onComplete") = secure {
-    val bits = E.many(int32).encodeAllValid(Vector(1,2,3))
-    var cleanedUp = false
-    val dec: StreamDecoder[Int] = D.many1(int32)
-      .flatMap { _ => D.fail(Err("oh noes!")) }
-      .onComplete { D.suspend { cleanedUp = true; D.empty }}
-    cleanedUp == false &&
-    dec.decode(bits).runFold(())((_, _) => ()).unsafeAttemptRun.isLeft
-  }
-
   property("isolate") = forAll { (ints: List[Int]) =>
     val bits = vector(int32).encode(ints.toVector).require
     val d =

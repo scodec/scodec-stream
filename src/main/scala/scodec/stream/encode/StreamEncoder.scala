@@ -7,7 +7,7 @@ import fs2.util.Sub1
 import scodec.bits.BitVector
 
 /**
- * A streaming encoding process, represented as a `Stream.Handle[Pure, A] => Pull[Pure, BitVector, (Stream.Handle[Pure, A], StreamEncoder[A])]`.
+ * A streaming encoding process, represented as a `Handle[Pure, A] => Pull[Pure, BitVector, (Handle[Pure, A], StreamEncoder[A])]`.
  * Pull[Pure, BitVector, StreamEncoder[A]]`.
  */
 trait StreamEncoder[A] {
@@ -24,10 +24,10 @@ trait StreamEncoder[A] {
 
   /** Encode the input stream of `A` values using this `StreamEncoder`. */
   final def encode[F[_]](in: Stream[F, A]): Stream[F, BitVector] = {
-    def substStep(s: Step[A]): Stream.Handle[F, A] => Pull[F, BitVector, (Stream.Handle[F, A], StreamEncoder[A])] =
-      Sub1.subst[({type f[g[_],x] = Stream.Handle[g,x] => Pull[g, BitVector, (Stream.Handle[g,x], StreamEncoder[A])]})#f, Pure, F, A](s)
+    def substStep(s: Step[A]): Handle[F, A] => Pull[F, BitVector, (Handle[F, A], StreamEncoder[A])] =
+      Sub1.subst[({type f[g[_],x] = Handle[g,x] => Pull[g, BitVector, (Handle[g,x], StreamEncoder[A])]})#f, Pure, F, A](s)
 
-    def go(h: Stream.Handle[F, A], encoder: StreamEncoder[A]): Pull[F, BitVector, (Stream.Handle[F, A], Option[StreamEncoder[A]])] = {
+    def go(h: Handle[F, A], encoder: StreamEncoder[A]): Pull[F, BitVector, (Handle[F, A], Option[StreamEncoder[A]])] = {
       substStep(encoder.encoder)(h) flatMap { case (h1, next) => go(h1, next) }
     }
     in.open.flatMap(h => go(h, this)).close
@@ -60,7 +60,7 @@ trait StreamEncoder[A] {
 
 object StreamEncoder {
 
-  type Step[A] = Stream.Handle[Pure, A] => Pull[Pure, BitVector, (Stream.Handle[Pure, A], StreamEncoder[A])]
+  type Step[A] = Handle[Pure, A] => Pull[Pure, BitVector, (Handle[Pure, A], StreamEncoder[A])]
 
   def instance[A](step: Step[A]): StreamEncoder[A] =
     new StreamEncoder[A] { val encoder = step }
