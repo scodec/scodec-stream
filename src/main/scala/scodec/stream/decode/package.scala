@@ -190,7 +190,7 @@ package object decode {
   // generic combinator, this could be added to fs2
   private def orImpl[F[_],A](s1: Stream[F,A], s2: Stream[F,A]): Stream[F,A] = {
     s1.pull2(s2)((h1,h2) =>
-      (h1.awaitNonEmpty.map(Some(_)) or Pull.pure(None)).flatMap {
+      (h1.await.map(Some(_)) or Pull.pure(None)).flatMap {
         case None => h2.echo
         case Some((hd, h1)) =>
           Pull.output(hd) >> h1.echo
