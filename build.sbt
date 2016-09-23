@@ -3,7 +3,9 @@ scodecModule := "scodec-stream"
 scodecPrimaryModule
 scodecPrimaryModuleJvm
 
-crossScalaVersions := Seq(scalaVersion.value, "2.12.0-M5") // fs2 does not support 2.10
+crossScalaVersions := Seq(scalaVersion.value)
+// Disable 2.12 build until RC2
+//crossScalaVersions := Seq(scalaVersion.value, "2.12.0-RC2") // fs2 does not support 2.10
 
 contributors ++= Seq(Contributor("mpilquist", "Michael Pilquist"), Contributor("pchiusano", "Paul Chiusano"))
 
@@ -11,8 +13,8 @@ rootPackage := "scodec.stream"
 
 libraryDependencies ++= Seq(
   "org.scodec" %% "scodec-core" % "1.10.2",
-  "co.fs2" %% "fs2-core" % "0.9.0-RC2",
-  "org.scalacheck" %% "scalacheck" % "1.13.1" % "test"
+  "co.fs2" %% "fs2-core" % "0.9.1",
+  "org.scalacheck" %% "scalacheck" % "1.13.2" % "test"
 )
 
 libraryDependencies ++= {

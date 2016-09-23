@@ -251,7 +251,7 @@ trait StreamDecoder[+A] { self =>
     dropWhile(f).take(1)
 
   /** Ignore the first `n` decoded values. */
-  def drop(n: Int): StreamDecoder[A] =
+  def drop(n: Long): StreamDecoder[A] =
     edit { _ drop n }
 
   /** Alias for `[[scodec.stream.decode.peek]](this)`. */
