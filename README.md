@@ -50,7 +50,7 @@ to [Typelevel](http://typelevel.org/about.html).
 
 ### Getting Binaries
 
-See the [releases page on the website](https://scodec.org/releases/).
+See the [releases page on the website](http://scodec.org/releases/).
 
 Sign up for the [mailing list](https://groups.google.com/forum/#!forum/scodec) if you want to be notified of future releases.
 
