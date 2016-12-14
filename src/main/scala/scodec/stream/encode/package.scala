@@ -35,8 +35,8 @@ package object encode {
   }
 
   /** A `StreamEncoder` that emits the given `BitVector`, then halts. */
-  def emit(bits: BitVector): StreamEncoder[Nothing] =
-    StreamEncoder.instance[Nothing] { h => Pull.output1(bits) >> Pull.pure(h -> empty) }
+  def emit[A](bits: BitVector): StreamEncoder[A] =
+    StreamEncoder.instance[A] { h => Pull.output1(bits) >> Pull.pure(h -> empty[A]) }
 
   /**
    * A `StreamEncoder` which encodes a single value, then halts.
