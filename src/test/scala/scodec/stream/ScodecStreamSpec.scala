@@ -120,5 +120,10 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
       toLazyBitVector(Stream.emits(bvs))(Strategy.sequential) == bvs.foldLeft(BitVector.empty) { _ ++ _ }
     }
   }
-}
 
+  property("encode.emit") = forAll { (toEmit: Int, ints: List[Int]) =>
+    val bv: BitVector = int32.encode(toEmit).require
+    val e: StreamEncoder[Int] = E.emit[Int](bv)
+    e.encode(Stream.emits(ints)).toList.foldLeft(BitVector.empty)(_ ++ _) == bv
+  }
+}
