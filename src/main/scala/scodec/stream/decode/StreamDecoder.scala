@@ -1,9 +1,12 @@
 package scodec.stream.decode
 
+import language.higherKinds
+
 import java.io.InputStream
-import java.nio.channels.{FileChannel, ReadableByteChannel}
+import java.nio.channels.{ FileChannel, ReadableByteChannel }
+import cats.~>
+import cats.effect.{ Effect, IO }
 import fs2._
-import fs2.util.{ ~> }
 import scala.util.control.NonFatal
 import scodec.{ Attempt, Decoder, DecodeResult, Err }
 import scodec.bits.BitVector
@@ -31,20 +34,20 @@ trait StreamDecoder[+A] { self =>
    * decoding error.
    */
   def decodeAllValid(bits: => BitVector): Vector[A] =
-    decode(bits).runLog.unsafeRun
+    decode[IO](bits).runLog.unsafeRunSync
 
   /**
    * Decoding a stream of `A` values from the given `BitVector`.
    * This function does not retain a reference to `bits`, allowing
    * it to be be garbage collected as the returned stream is traversed.
    */
-  final def decode(bits: => BitVector): Stream[Task,A] = Stream.suspend {
+  final def decode[F[_]](bits: => BitVector)(implicit F: Effect[F]): Stream[F,A] = Stream.suspend {
     @volatile var cur = bits // am pretty sure this doesn't need to be volatile, but just being safe
-    decoder.translate(new (Cursor ~> Task) {
-      def apply[X](c: Cursor[X]): Task[X] = Task.suspend {
+    decoder.translate(new (Cursor ~> F) {
+      def apply[X](c: Cursor[X]): F[X] = F.suspend {
         c.run(cur).fold(
-          msg => Task.fail(DecodingError(msg)),
-          res => Task.now { cur = res.remainder; res.value }
+          msg => F.raiseError(DecodingError(msg)),
+          res => F.pure { cur = res.remainder; res.value }
         )
       }
     })
@@ -53,59 +56,59 @@ trait StreamDecoder[+A] { self =>
   /**
    * Resource-safe version of `decode`. Acquires a resource,
    * decodes a stream of values, and releases the resource when
-   * the returned `Stream[Task,A]` is finished being consumed.
+   * the returned `Stream[F,A]` is finished being consumed.
    * The `acquire` and `release` actions may be asynchronous.
    */
-  final def decodeAsyncResource[R](acquire: Task[R])(
+  final def decodeAsyncResource[F[_]: Effect,R](acquire: F[R])(
       read: R => BitVector,
-      release: R => Task[Unit]): Stream[Task,A] = {
+      release: R => F[Unit]): Stream[F,A] = {
     Stream.bracket(acquire)(read andThen { b => decode(b) }, release)
   }
 
   /**
    * Resource-safe version of `decode`. Acquires a resource,
    * decodes a stream of values, and releases the resource when
-   * the returned `Stream[Task,A]` is finished being consumed.
+   * the returned `Stream[F,A]` is finished being consumed.
    * If the `acquire` and `release` actions are asynchronous, use
    * [[decodeAsyncResource]].
    */
-  final def decodeResource[R](acquire: => R)(
+  final def decodeResource[F[_],R](acquire: => R)(
       read: R => BitVector,
-      release: R => Unit): Stream[Task,A] =
-    decodeAsyncResource(Task.delay(acquire))(read, r => Task.delay(release(r)))
+      release: R => Unit)(implicit F: Effect[F]): Stream[F,A] =
+    decodeAsyncResource(F.delay(acquire))(read, r => F.delay(release(r)))
 
   /**
    * Resource-safe version of `decode` for an `InputStream` resource.
    * This is just a convenience function which calls [[decodeResource]], using
    * `scodec.bits.BitVector.fromInputStream` as the `read` function, and which
-   * closes `in` after the returned `Stream[Task,A]` is consumed.
+   * closes `in` after the returned `Stream[F,A]` is consumed.
    */
-  final def decodeInputStream(
+  final def decodeInputStream[F[_]:Effect](
       in: => InputStream,
-      chunkSizeInBytes: Int = 1024 * 1000 * 16): Stream[Task,A] =
+      chunkSizeInBytes: Int = 1024 * 1000 * 16): Stream[F,A] =
     decodeResource(in)(BitVector.fromInputStream(_, chunkSizeInBytes), _.close)
 
   /**
    * Resource-safe version of `decode` for a `ReadableByteChannel` resource.
    * This is just a convenience function which calls [[decodeResource]], using
    * `scodec.bits.BitVector.fromChannel` as the `read` function, and which
-   * closes `in` after the returned `Stream[Task,A]` is consumed.
+   * closes `in` after the returned `Stream[F,A]` is consumed.
    */
-  final def decodeChannel(
+  final def decodeChannel[F[_]: Effect](
       in: => ReadableByteChannel,
       chunkSizeInBytes: Int = 1024 * 1000 * 16,
-      direct: Boolean = false): Stream[Task,A] =
+      direct: Boolean = false): Stream[F,A] =
     decodeResource(in)(BitVector.fromChannel(_, chunkSizeInBytes, direct), _.close)
 
   /**
    * Resource-safe version of `decode` for a `ReadableByteChannel` resource.
    * This is just a convenience function which calls [[decodeResource]], using
    * `scodec.bits.BitVector.fromChannel` as the `read` function, and which
-   * closes `in` after the returned `Stream[Task,A]` is consumed.
+   * closes `in` after the returned `Stream[F,A]` is consumed.
    */
-  final def decodeMmap(
+  final def decodeMmap[F[_]: Effect](
       in: => FileChannel,
-      chunkSizeInBytes: Int = 1024 * 1000 * 16): Stream[Task,A] =
+      chunkSizeInBytes: Int = 1024 * 1000 * 16): Stream[F,A] =
     decodeResource(in)(BitVector.fromMmap(_, chunkSizeInBytes), _.close)
 
   /** Modify the `Stream[Cursor,A]` backing this `StreamDecoder`. */
@@ -178,12 +181,10 @@ trait StreamDecoder[+A] { self =>
    */
   def nonEmpty(errIfEmpty: Err): StreamDecoder[A] =
     through { s =>
-      s.open.flatMap { h =>
-        h.awaitOption.flatMap {
-          case None => Pull.fail(DecodingError(errIfEmpty))
-          case Some((a, h1)) => Pull.output(a) >> h1.echo
-        }
-      }.close
+      s.pull.uncons.flatMap {
+        case None => Pull.fail(DecodingError(errIfEmpty))
+        case Some((hd,tl)) => Pull.output(hd) >> tl.pull.echo
+      }.stream
     }
 
   /**
@@ -211,18 +212,21 @@ trait StreamDecoder[+A] { self =>
    * Alternate between decoding `A` values using this `StreamDecoder`,
    * and decoding `B` values which are ignored.
    */
-  def sepBy[B](implicit B: Lazy[Decoder[B]]): StreamDecoder[A] =
+  def sepBy[B](implicit B: Lazy[Decoder[B]]): StreamDecoder[A] = {
     through2(D.many[B]) { (value, delimiter) =>
-      value.pull2(delimiter) { (valueHandle, delimiterHandle) =>
-        def decodeValue(vh: Handle[Pure, A], dh: Handle[Pure, B]): Pull[Pure, A, Nothing] = {
-          vh.receive1 { (v, vh1) => Pull.output1(v) >> decodeDelimiter(vh1, dh) }
+      def decodeValue(vs: Stream[Pure, A], ds: Stream[Pure, B]): Pull[Pure,A,Unit] =
+        vs.pull.uncons1.flatMap {
+          case Some((v,vs1)) => Pull.output1(v) >> decodeDelimiter(vs1,ds)
+          case None => Pull.done
         }
-        def decodeDelimiter(vh: Handle[Pure, A], dh: Handle[Pure, B]): Pull[Pure, A, Nothing] = {
-          dh.receive1 { (d, dh1) => decodeValue(vh, dh1) }
+      def decodeDelimiter(vs: Stream[Pure, A], ds: Stream[Pure, B]): Pull[Pure,A,Unit] =
+        ds.pull.uncons1.flatMap {
+          case Some((d,ds1)) => decodeValue(vs,ds1)
+          case None => Pull.done
         }
-        decodeValue(valueHandle, delimiterHandle)
-      }
+      decodeValue(value, delimiter).stream
     }
+  }
 
   /** Decode at most `n` values using this `StreamDecoder`. */
   def take(n: Long): StreamDecoder[A] =
@@ -271,7 +275,7 @@ trait StreamDecoder[+A] { self =>
   final def strict: Decoder[Vector[A]] = new Decoder[Vector[A]] {
     def decode(bits: BitVector) = {
       try {
-        val result = (self ++ D.ask).decode(bits).runLog.unsafeRun
+        val result = (self ++ D.ask).decode[IO](bits).runLog.unsafeRunSync
         val as = result.init.asInstanceOf[Vector[A]]
         val remainder = result.last.asInstanceOf[BitVector]
         Attempt.successful(DecodeResult(as, remainder))

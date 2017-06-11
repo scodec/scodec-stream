@@ -2,16 +2,14 @@ package scodec.stream.encode
 
 import language.higherKinds
 
+import cats.effect.IO
 import fs2._
-import fs2.util.Sub1
 import scodec.bits.BitVector
 
 /**
- * A streaming encoding process, represented as a `Handle[Pure, A] => Pull[Pure, BitVector, (Handle[Pure, A], StreamEncoder[A])]`.
- * Pull[Pure, BitVector, StreamEncoder[A]]`.
+ * A streaming encoding process, represented as a `Stream[Pure, A] => Pull[Pure, BitVector, Option[(Stream[Pure, A], StreamEncoder[A])]]`.
  */
 trait StreamEncoder[A] {
-  import StreamEncoder._
 
   def encoder: StreamEncoder.Step[A]
 
@@ -20,17 +18,17 @@ trait StreamEncoder[A] {
    * in the event of an encoding error.
    */
   def encodeAllValid(in: Seq[A]): BitVector =
-    encode(Stream.emits(in)).covary[Task].runFold(BitVector.empty)(_ ++ _).unsafeRun
+    encode(Stream.emits(in)).covary[IO].runFold(BitVector.empty)(_ ++ _).unsafeRunSync
 
   /** Encode the input stream of `A` values using this `StreamEncoder`. */
   final def encode[F[_]](in: Stream[F, A]): Stream[F, BitVector] = {
-    def substStep(s: Step[A]): Handle[F, A] => Pull[F, BitVector, (Handle[F, A], StreamEncoder[A])] =
-      Sub1.subst[({type f[g[_],x] = Handle[g,x] => Pull[g, BitVector, (Handle[g,x], StreamEncoder[A])]})#f, Pure, F, A](s)
-
-    def go(h: Handle[F, A], encoder: StreamEncoder[A]): Pull[F, BitVector, (Handle[F, A], Option[StreamEncoder[A]])] = {
-      substStep(encoder.encoder)(h) flatMap { case (h1, next) => go(h1, next) }
+    def go(s: Stream[F, A], encoder: StreamEncoder[A]): Pull[F, BitVector, Option[(Stream[F, A], StreamEncoder[A])]] = {
+      encoder.encoder.asInstanceOf[Stream[F,A] => Pull[F,BitVector,Option[(Stream[F,A],StreamEncoder[A])]]].apply(s) flatMap {
+        case Some((s, next)) => go(s, next)
+        case None => Pull.pure(None)
+      }
     }
-    in.open.flatMap(h => go(h, this)).close
+    go(in, this).stream
   }
 
   /** Modify the `Pull` backing this `StreamEncoder`. */
@@ -38,29 +36,29 @@ trait StreamEncoder[A] {
     StreamEncoder.instance { f(encoder) }
 
   def or(other: StreamEncoder[A]): StreamEncoder[A] =
-    edit[A] { o => h => o(h) or other.encoder(h) }
+    edit[A] { o => s => o(s).flatMap { case Some(x) => Pull.pure(Some(x)); case None => other.encoder(s) } }
 
   /** Encode values as long as there are more inputs. */
   def many: StreamEncoder[A] = this ++ many
 
   /** Run this `StreamEncoder`, followed by `e`. */
   def ++(e: => StreamEncoder[A]): StreamEncoder[A] =
-    edit { o => h => o(h).map { case (h1, next) => (h1, next or e) }}
+    edit { o => s => o(s).map { _.map { case (s1, next) => (s1, next or e) }}}
 
   /** Transform the input type of this `StreamEncoder`. */
   final def xmapc[B](f: A => B)(g: B => A): StreamEncoder[B] =
-    edit { o => h => o(h.map(g)).map { case (h1, e1) => h1.map(f) -> e1.xmapc(f)(g) }}
+    edit { o => s => o(s.map(g)).map { _.map { case (s1, e1) => s1.map(f) -> e1.xmapc(f)(g) }}}
 
   /** Encode at most `n` values. */
-  def take(n: Long): StreamEncoder[A] = edit { step => h =>
-    if (n <= 0) Pull.done
-    else step(h) map { case (h, s2) => (h, s2.take(n-1)) }
+  def take(n: Long): StreamEncoder[A] = edit { step => s =>
+    if (n <= 0) Pull.pure(None)
+    else step(s) map { _.map { case (s, s2) => (s, s2.take(n-1)) }}
   }
 }
 
 object StreamEncoder {
 
-  type Step[A] = Handle[Pure, A] => Pull[Pure, BitVector, (Handle[Pure, A], StreamEncoder[A])]
+  type Step[A] = Stream[Pure, A] => Pull[Pure, BitVector, Option[(Stream[Pure, A], StreamEncoder[A])]]
 
   def instance[A](step: Step[A]): StreamEncoder[A] =
     new StreamEncoder[A] { val encoder = step }

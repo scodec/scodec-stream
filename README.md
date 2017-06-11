@@ -1,26 +1,25 @@
 scodec-stream
 =============
 
-Scodec-stream is a library for streaming binary encoding and decoding. It is built atop [scodec](https://github.com/scodec/scodec) and [fs2][]. Here's a brief example of its use:
+Scodec-stream is a library for streaming binary encoding and decoding. It is built atop [scodec](https://github.com/scodec/scodec) and [fs2](https://github.com/functional-streams-for-scala/fs2). Here's a brief example of its use:
 
 ```Scala
 import scodec.{codecs => C}
 import scodec.stream.{decode => D, StreamDecoder}
 import scodec.bits.ByteVector
+import cats.effect.IO
 
 val frames: StreamDecoder[ByteVector] = D.once(C.int32)
  .flatMap { numBytes => D.once(C.bytes(numBytes)).isolate(numBytes) }
  .many
 
-val s: Stream[fs2.util.Task, ByteVector] =
-  frames.decodeMmap(new java.io.FileInputStream("largefile.bin").getChannel)
+val s: Stream[IO, ByteVector] =
+  frames.decodeMmap[IO](new java.io.FileInputStream("largefile.bin").getChannel)
 ```
-
-[fs2]: https://github.com/functional-streams-for-scala/fs2
 
 When consumed, `s` will memory map in the contents of `"largefile.bin"`, then decode a stream of frames, where each frame is expected to begin with a number of bytes specified as a 32-bit signed int (the `int32` codec), followed by a frame payload of that many bytes. Nothing happens until the `s` stream is consumed, and `s` will ensure the `FileChannel` is closed in the event of an error or normal termination of the consumer. See [the guide](#guide) for further information and discussion of streaming encoding.
 
-Decoding speeds have been observed at 100 MB/s for some realistic examples ([decoding MPEG packets from a `.pcap` file](https://github.com/scodec/scodec-stream/blob/series/1.0.x/src/test/scala/scodec/stream/examples/Mpeg.scala)), though decoding speed will generally depend on how fine-grained the decoding is.
+Decoding speeds have been observed at 100 MB/s for some realistic examples ([decoding MPEG packets from a `.pcap` file](https://github.com/scodec/scodec-stream/blob/series/1.1.x/src/test/scala/scodec/stream/examples/Mpeg.scala)), though decoding speed will generally depend on how fine-grained the decoding is.
 
 __Links:__
 
@@ -115,27 +114,27 @@ Since encoders only retain references to previously received values if they do s
 
 ##### Running encoders
 
-An `e: StreamEncoder[A]` may be applied to any `s: Stream[F,A]` via `e.encode(s)`, which returns a `Stream[F,BitVector]` that can be dumped to a file using normal [fs2][] I/O combinators. We welcome contributions of helper functions for common encoding cases.
+An `e: StreamEncoder[A]` may be applied to any `s: Stream[F,A]` via `e.encode(s)`, which returns a `Stream[F,BitVector]` that can be dumped to a file using normal fs2 I/O combinators. We welcome contributions of helper functions for common encoding cases.
 
 The representation of `StreamEncoder` means it can be used to transform the result of a `StreamDecoder`, for instance:
 
 ```Scala
 import scodec.codecs
 import scodec.stream.{encode,decode,StreamDecoder,StreamEncoder}
-import fs2.util.Task
+import cats.effect.IO
 
 // skip first 64 bits, then decode
 val d: StreamDecoder[Int] = decode.advance(64) ++ decode.many(codecs.int32)
 val e: StreamEncoder[Int] = encode.many(codecs.int16)
 
-val t: Task[Unit] =
- e.encode { d.decodeMmap(new FileInputStream("largefile.bin").getChannel) }
-  .map(_.toByteVector)
-  .to(fs2.io.fileChunkW("smallerfile.bin")) // TODO Update this for fs2 when IO module is ready
-  .run.run
+val t: IO[Unit] =
+ e.encode { d.decodeMmap[IO](new FileInputStream("largefile.bin").getChannel) }
+  .map(bits => Chunk.bytes(bits.toByteArray))
+  .to(fs2.io.file.writeAll(java.nio.file.Paths.get("smallerfile.bin")))
+  .run
 
 // at the end of the universe
-t.unsafeRun
+t.unsafeRunSync
 ```
 
-Calling `t.unsafeRun` will do a streaming decode of the `"largefile.bin"` file, skipping the first 64 bits, then a stream of signed 32 bit ints, which it downsamples to 16 bits and streams to the output file `"smallerfile.bin"`, raising an [`EncodingError`][enc-err] in the event of a format error or if an integer from the input fails to fit within 16 bits.
+Calling `t.unsafeRunSync` will do a streaming decode of the `"largefile.bin"` file, skipping the first 64 bits, then a stream of signed 32 bit ints, which it downsamples to 16 bits and streams to the output file `"smallerfile.bin"`, raising an [`EncodingError`][enc-err] in the event of a format error or if an integer from the input fails to fit within 16 bits.

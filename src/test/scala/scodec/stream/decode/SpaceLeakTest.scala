@@ -1,5 +1,8 @@
 package scodec.stream.decode
 
+import cats.implicits._
+import cats.effect.IO
+
 import org.scalacheck._
 import Prop._
 import scodec.codecs._
@@ -17,9 +20,9 @@ object SpaceLeakTest extends Properties("space-leak") {
     def chunks = BitVector.unfold(0)(_ => Some(ints.encode(chunk).require -> 0))
     val dec = many(ints).take(N).
       flatMap(chunk => emits(chunk)).
-      through(fs2.pipe.sum)
+      through(_.foldMonoid)
 
-    val r = dec.decode(chunks)
-    r.runFold(0)((_, last) => last).unsafeRun == (0 until M).sum * N
+    val r = dec.decode[IO](chunks)
+    r.runFold(0)((_, last) => last).unsafeRunSync == (0 until M).sum * N
   }
 }

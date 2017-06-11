@@ -1,8 +1,11 @@
 package scodec.stream
 
+import scala.concurrent.ExecutionContext.Implicits.global
+
+import cats.effect.IO
 import org.scalacheck._
 import Prop._
-import fs2.{ Strategy, Stream }
+import fs2.Stream
 import scodec.bits.BitVector
 import scodec.{ Attempt, Decoder, Err }
 import scodec.codecs._
@@ -27,12 +30,12 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
   property("tryMany-example") = secure {
     val bits = E.many(int32).encodeAllValid(Vector(1,2,3))
     D.tryMany(int32).decodeAllValid(bits).toList == List(1,2,3) &&
-    D.tryMany(int32).decode(bits).runLog.unsafeRun.toList == List(1,2,3)
+    D.tryMany(int32).decode[IO](bits).runLog.unsafeRunSync.toList == List(1,2,3)
   }
 
   property("many1") = forAll { (ints: List[Int]) =>
     val bits = E.many(int32).encodeAllValid(ints)
-    D.many1(int32).decode(bits).runLog.unsafeAttemptRun.fold(
+    D.many1(int32).decode[IO](bits).runLog.attempt.unsafeRunSync.fold(
       err => ints.isEmpty,
       vec => vec.toList == ints
     )
@@ -43,7 +46,7 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
     val d =
       D.many(int32).isolate(bits.size).map(_ => 0) ++
       D.many(int32).isolate(bits.size).map(_ => 1)
-    val res = d.decode(bits ++ bits).runLog.unsafeRun
+    val res = d.decode[IO](bits ++ bits).runLog.unsafeRunSync
     res == (Vector.fill(ints.size)(0) ++ Vector.fill(ints.size.toInt)(1))
   }
 
@@ -80,12 +83,12 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
     import scodec.stream.{encode => E}
     val bits = E.once(string).many.encodeAllValid(strings)
     var cleanedUp = 0
-    val decoded = D.many(string).decodeResource(())(_ => bits, _ => cleanedUp += 1)
+    val decoded = D.many(string).decodeResource[IO,Unit](())(_ => bits, _ => cleanedUp += 1)
     cleanedUp == 0 && // make sure we don't bump this strictly
-    decoded.runLog.unsafeRun.toList == strings && // normal termination
-    decoded.take(2).runLog.unsafeRun.toList == strings.take(2) && // early termination
+    decoded.runLog.unsafeRunSync.toList == strings && // normal termination
+    decoded.take(2).runLog.unsafeRunSync.toList == strings.take(2) && // early termination
     { // exceptions
-      val failed = decoded.take(3).map(_ => sys.error("die")).runLog.unsafeAttemptRun.isLeft
+      val failed = decoded.take(3).map(_ => sys.error("die")).runLog.attempt.unsafeRunSync.isLeft
       strings.isEmpty || failed
     } &&
     cleanedUp == 3
@@ -103,12 +106,12 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
     include(new Properties("fixed size") {
       property("strings") = forAll { (strings: List[String], chunkSize: Chunk) =>
         val bits = E.many(string).encodeAllValid(strings)
-        val chunks = Stream.emits(bits.grouped(chunkSize.get.toLong)).pure
+        val chunks = Stream.emits(bits.grouped(chunkSize.get.toLong))
         (chunks through D.pipe(string)).toList == strings
       }
       property("ints") = forAll { (ints: List[Int], chunkSize: Chunk) =>
         val bits = E.many(int32).encodeAllValid(ints)
-        val chunks = Stream.emits(bits.grouped(chunkSize.get.toLong)).pure
+        val chunks = Stream.emits(bits.grouped(chunkSize.get.toLong))
         (chunks through D.pipe(int32)).toList == ints
       }
     }, "process.")
@@ -117,7 +120,7 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
   property("toLazyBitVector") = {
     forAll { (ints: List[Int]) =>
       val bvs = ints.map { i => int32.encode(i).require }
-      toLazyBitVector(Stream.emits(bvs))(Strategy.sequential) == bvs.foldLeft(BitVector.empty) { _ ++ _ }
+      toLazyBitVector(Stream.emits(bvs)) == bvs.foldLeft(BitVector.empty) { _ ++ _ }
     }
   }
 

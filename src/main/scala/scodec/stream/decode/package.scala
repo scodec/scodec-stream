@@ -114,7 +114,7 @@ package object decode {
     }
 
   /**
-   * Promote a decoder to a `Pipe[F, BitVector, A`. The returned pipe may be
+   * Promote a decoder to a `Pipe[F, BitVector, A]`. The returned pipe may be
    * given chunks larger or smaller than what is needed to decode a single
    * element, and will buffer any unconsumed input, but a decoding error
    * will result if the decoder fails for a reason other than `Err.InsufficientBits`.
@@ -130,17 +130,19 @@ package object decode {
    */
   def pipe[F[_], A](implicit A: Lazy[Decoder[A]]): Pipe[F, BitVector, A] = {
 
-    def waiting[I](remainder: BitVector)(h: Handle[F, BitVector]): Pull[F, A, Handle[F, BitVector]] = {
-      h.receive1 { (bits, h) =>
-        consume(A.value)(remainder ++ bits, Vector.empty) match {
-          case (rem, out, err: Err.InsufficientBits) => Pull.output(Chunk.seq(out)) >> waiting(rem)(h)
-          case (rem, Vector(), lastError) => Pull.fail(DecodingError(lastError))
-          case (rem, out, _) => Pull.output(Chunk.seq(out)) >> waiting(rem)(h)
-        }
+    def waiting[I](remainder: BitVector)(s: Stream[F, BitVector]): Pull[F, A, Unit] = {
+      s.pull.uncons1.flatMap {
+        case None => Pull.done
+        case Some((bits, tl)) =>
+          consume(A.value)(remainder ++ bits, Vector.empty) match {
+            case (rem, out, err: Err.InsufficientBits) => Pull.output(Chunk.seq(out)) >> waiting(rem)(tl)
+            case (rem, Vector(), lastError) => Pull.fail(DecodingError(lastError))
+            case (rem, out, _) => Pull.output(Chunk.seq(out)) >> waiting(rem)(tl)
+          }
       }
     }
 
-    _ pull waiting(BitVector.empty)
+    in => waiting(BitVector.empty)(in).stream
   }
 
   /**
@@ -189,12 +191,10 @@ package object decode {
 
   // generic combinator, this could be added to fs2
   private def orImpl[F[_],A](s1: Stream[F,A], s2: Stream[F,A]): Stream[F,A] = {
-    s1.pull2(s2)((h1,h2) =>
-      (h1.await.map(Some(_)) or Pull.pure(None)).flatMap {
-        case None => h2.echo
-        case Some((hd, h1)) =>
-          Pull.output(hd) >> h1.echo
-      })
+    s1.pull.uncons.flatMap {
+      case Some((hd,tl)) => Pull.output(hd) >> tl.pull.echo
+      case None => s2.pull.echo
+    }.stream
   }
 
   /**

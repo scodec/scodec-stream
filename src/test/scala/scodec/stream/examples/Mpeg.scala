@@ -1,6 +1,9 @@
 package scodec.stream.examples
 
 import scala.concurrent.duration._
+
+import cats.effect.IO
+
 import scodec.bits._
 import scodec._
 import scodec.stream._
@@ -49,8 +52,8 @@ object Mpeg extends App {
     result
   }
   def channel = new FileInputStream(new File("path/to/file")).getChannel
-  val result2 = time("coarse-grained") { streamThroughRecordsOnly.decodeMmap(channel).runFold(0)((acc, _) => acc + 1).unsafeRun }
-  val result1 = time("fine-grained") { streamier.decodeMmap(channel).runFold(0)((acc, _) => acc + 1).unsafeRun }
+  val result2 = time("coarse-grained") { streamThroughRecordsOnly.decodeMmap[IO](channel).runFold(0)((acc, _) => acc + 1).unsafeRunSync }
+  val result1 = time("fine-grained") { streamier.decodeMmap[IO](channel).runFold(0)((acc, _) => acc + 1).unsafeRunSync }
   println("fine-grained stream packet count: " + result1)
   println("coarse-grained stream packet count: " + result2)
 }
