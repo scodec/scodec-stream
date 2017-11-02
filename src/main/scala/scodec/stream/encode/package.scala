@@ -32,13 +32,13 @@ package object encode {
         A.value.encode(a).fold(
           e => Pull.fail(EncodingError(e)),
           b => Pull.output1(b)
-        ) >> Pull.pure(Some(s1 -> empty))
+        ) *> Pull.pure(Some(s1 -> empty))
     }
   }
 
   /** A `StreamEncoder` that emits the given `BitVector`, then halts. */
   def emit[A](bits: BitVector): StreamEncoder[A] =
-    StreamEncoder.instance[A] { s => Pull.output1(bits) >> Pull.pure(Some(s -> empty[A])) }
+    StreamEncoder.instance[A] { s => Pull.output1(bits) *> Pull.pure(Some(s -> empty[A])) }
 
   /**
    * A `StreamEncoder` which encodes a single value, then halts.
@@ -50,7 +50,7 @@ package object encode {
       case Some((a, s1)) =>
         A.value.encode(a).fold(
           e => Pull.pure(Some(s1 -> empty)),
-          b => Pull.output1(b) >> Pull.pure(Some(s1 -> empty))
+          b => Pull.output1(b) *> Pull.pure(Some(s1 -> empty))
         )
     }
   }

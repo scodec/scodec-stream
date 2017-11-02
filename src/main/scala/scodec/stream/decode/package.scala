@@ -135,9 +135,9 @@ package object decode {
         case None => Pull.done
         case Some((bits, tl)) =>
           consume(A.value)(remainder ++ bits, Vector.empty) match {
-            case (rem, out, err: Err.InsufficientBits) => Pull.output(Chunk.seq(out)) >> waiting(rem)(tl)
+            case (rem, out, err: Err.InsufficientBits) => Pull.output(Chunk.seq(out)) *> waiting(rem)(tl)
             case (rem, Vector(), lastError) => Pull.fail(DecodingError(lastError))
-            case (rem, out, _) => Pull.output(Chunk.seq(out)) >> waiting(rem)(tl)
+            case (rem, out, _) => Pull.output(Chunk.seq(out)) *> waiting(rem)(tl)
           }
       }
     }
@@ -192,7 +192,7 @@ package object decode {
   // generic combinator, this could be added to fs2
   private def orImpl[F[_],A](s1: Stream[F,A], s2: Stream[F,A]): Stream[F,A] = {
     s1.pull.uncons.flatMap {
-      case Some((hd,tl)) => Pull.output(hd) >> tl.pull.echo
+      case Some((hd,tl)) => Pull.output(hd) *> tl.pull.echo
       case None => s2.pull.echo
     }.stream
   }
