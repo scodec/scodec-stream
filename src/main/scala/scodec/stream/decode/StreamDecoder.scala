@@ -173,7 +173,7 @@ trait StreamDecoder[+A] { self =>
    * to decoding failures.
    */
   final def mapEither[B](f: A => Either[Err, B]): StreamDecoder[B] =
-    this.flatMap { a => f(a).fold(D.fail, D.emit) }
+    this.flatMap { a => f(a).fold(D.raiseError, D.emit) }
 
   /**
    * Raises a decoding error if the given decoder emits no results,
@@ -182,8 +182,8 @@ trait StreamDecoder[+A] { self =>
   def nonEmpty(errIfEmpty: Err): StreamDecoder[A] =
     through { s =>
       s.pull.uncons.flatMap {
-        case None => Pull.fail(DecodingError(errIfEmpty))
-        case Some((hd,tl)) => Pull.output(hd) *> tl.pull.echo
+        case None => Pull.raiseError(DecodingError(errIfEmpty))
+        case Some((hd,tl)) => Pull.output(hd) >> tl.pull.echo
       }.stream
     }
 
@@ -216,7 +216,7 @@ trait StreamDecoder[+A] { self =>
     through2(D.many[B]) { (value, delimiter) =>
       def decodeValue(vs: Stream[Pure, A], ds: Stream[Pure, B]): Pull[Pure,A,Unit] =
         vs.pull.uncons1.flatMap {
-          case Some((v,vs1)) => Pull.output1(v) *> decodeDelimiter(vs1,ds)
+          case Some((v,vs1)) => Pull.output1(v) >> decodeDelimiter(vs1,ds)
           case None => Pull.done
         }
       def decodeDelimiter(vs: Stream[Pure, A], ds: Stream[Pure, B]): Pull[Pure,A,Unit] =

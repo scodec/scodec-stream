@@ -19,12 +19,12 @@ package object decode {
     StreamDecoder.instance { Stream.empty }
 
   /** The decoder that consumes no input and halts with the given error. */
-  def fail(err: Throwable): StreamDecoder[Nothing] =
-    StreamDecoder.instance { Stream.fail(err) }
+  def raiseError(err: Throwable): StreamDecoder[Nothing] =
+    StreamDecoder.instance { Stream.raiseError(err) }
 
   /** The decoder that consumes no input and halts with the given error. */
-  def fail(err: Err): StreamDecoder[Nothing] =
-    StreamDecoder.instance { Stream.fail(DecodingError(err)) }
+  def raiseError(err: Err): StreamDecoder[Nothing] =
+    StreamDecoder.instance { Stream.raiseError(DecodingError(err)) }
 
   /** The decoder that consumes no input, emits the given `a`, then halts. */
   def emit[A](a: A): StreamDecoder[A] =
@@ -85,7 +85,7 @@ package object decode {
   /** Run the given `Decoder[A]` on `in`, returning its result as a `StreamDecoder`. */
   private[decode] def runDecode[A](in: BitVector)(implicit A: Lazy[Decoder[A]]): StreamDecoder[A] =
     A.value.decode(in).fold(
-      fail,
+      raiseError,
       { result => set(result.remainder) ++ emit(result.value) }
     )
 
@@ -135,9 +135,9 @@ package object decode {
         case None => Pull.done
         case Some((bits, tl)) =>
           consume(A.value)(remainder ++ bits, Vector.empty) match {
-            case (rem, out, err: Err.InsufficientBits) => Pull.output(Chunk.seq(out)) *> waiting(rem)(tl)
-            case (rem, Vector(), lastError) => Pull.fail(DecodingError(lastError))
-            case (rem, out, _) => Pull.output(Chunk.seq(out)) *> waiting(rem)(tl)
+            case (rem, out, err: Err.InsufficientBits) => Pull.outputChunk(Chunk.seq(out)) >> waiting(rem)(tl)
+            case (rem, Vector(), lastError) => Pull.raiseError(DecodingError(lastError))
+            case (rem, out, _) => Pull.outputChunk(Chunk.seq(out)) >> waiting(rem)(tl)
           }
       }
     }
@@ -192,7 +192,7 @@ package object decode {
   // generic combinator, this could be added to fs2
   private def orImpl[F[_],A](s1: Stream[F,A], s2: Stream[F,A]): Stream[F,A] = {
     s1.pull.uncons.flatMap {
-      case Some((hd,tl)) => Pull.output(hd) *> tl.pull.echo
+      case Some((hd,tl)) => Pull.output(hd) >> tl.pull.echo
       case None => s2.pull.echo
     }.stream
   }

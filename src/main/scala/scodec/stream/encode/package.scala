@@ -9,12 +9,12 @@ import shapeless.Lazy
 package object encode {
 
   /** The encoder that consumes no input and halts with the given error. */
-  def fail[A](err: Throwable): StreamEncoder[A] =
-    StreamEncoder.instance[A] { _ => Pull.fail(err) }
+  def raiseError[A](err: Throwable): StreamEncoder[A] =
+    StreamEncoder.instance[A] { _ => Pull.raiseError(err) }
 
   /** The encoder that consumes no input and halts with the given error message. */
-  def fail[A](err: Err): StreamEncoder[A] =
-    StreamEncoder.instance[A] { _ => Pull.fail(EncodingError(err)) }
+  def raiseError[A](err: Err): StreamEncoder[A] =
+    StreamEncoder.instance[A] { _ => Pull.raiseError(EncodingError(err)) }
 
   /** The encoder that consumes no input and emits no values. */
   def empty[A]: StreamEncoder[A] =
@@ -30,15 +30,15 @@ package object encode {
       case None => Pull.pure(None)
       case Some((a, s1)) =>
         A.value.encode(a).fold(
-          e => Pull.fail(EncodingError(e)),
+          e => Pull.raiseError(EncodingError(e)),
           b => Pull.output1(b)
-        ) *> Pull.pure(Some(s1 -> empty))
+        ) >> Pull.pure(Some(s1 -> empty))
     }
   }
 
   /** A `StreamEncoder` that emits the given `BitVector`, then halts. */
   def emit[A](bits: BitVector): StreamEncoder[A] =
-    StreamEncoder.instance[A] { s => Pull.output1(bits) *> Pull.pure(Some(s -> empty[A])) }
+    StreamEncoder.instance[A] { s => Pull.output1(bits) >> Pull.pure(Some(s -> empty[A])) }
 
   /**
    * A `StreamEncoder` which encodes a single value, then halts.
@@ -50,7 +50,7 @@ package object encode {
       case Some((a, s1)) =>
         A.value.encode(a).fold(
           e => Pull.pure(Some(s1 -> empty)),
-          b => Pull.output1(b) *> Pull.pure(Some(s1 -> empty))
+          b => Pull.output1(b) >> Pull.pure(Some(s1 -> empty))
         )
     }
   }
