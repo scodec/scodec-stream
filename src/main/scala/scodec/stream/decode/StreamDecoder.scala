@@ -34,7 +34,7 @@ trait StreamDecoder[+A] { self =>
    * decoding error.
    */
   def decodeAllValid(bits: => BitVector): Vector[A] =
-    decode[IO](bits).runLog.unsafeRunSync
+    decode[IO](bits).compile.toVector.unsafeRunSync
 
   /**
    * Decoding a stream of `A` values from the given `BitVector`.
@@ -275,7 +275,7 @@ trait StreamDecoder[+A] { self =>
   final def strict: Decoder[Vector[A]] = new Decoder[Vector[A]] {
     def decode(bits: BitVector) = {
       try {
-        val result = (self ++ D.ask).decode[IO](bits).runLog.unsafeRunSync
+        val result = (self ++ D.ask).decode[IO](bits).compile.toVector.unsafeRunSync
         val as = result.init.asInstanceOf[Vector[A]]
         val remainder = result.last.asInstanceOf[BitVector]
         Attempt.successful(DecodeResult(as, remainder))

@@ -22,7 +22,11 @@ object SpaceLeakTest extends Properties("space-leak") {
       flatMap(chunk => emits(chunk)).
       through(_.foldMonoid)
 
+    try {
     val r = dec.decode[IO](chunks)
-    r.runFold(0)((_, last) => last).unsafeRunSync == (0 until M).sum * N
+    r.compile.fold(0)((_, last) => last).unsafeRunSync == (0 until M).sum * N
+  } catch {
+    case t: Throwable => t.printStackTrace; throw t
+  }
   }
 }

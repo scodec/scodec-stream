@@ -23,7 +23,7 @@ package object stream {
   def toLazyBitVector(in: Stream[IO, BitVector], bufferSize: Int = 100)(implicit ec: ExecutionContext): BitVector = {
     val queue = Queue.bounded[IO, Option[BitVector]](bufferSize).unsafeRunSync
 
-    val fill: IO[Unit] = in.mask.noneTerminate.evalMap(queue.enqueue1).run
+    val fill: IO[Unit] = in.mask.noneTerminate.evalMap(queue.enqueue1).compile.drain
     async.unsafeRunAsync(fill)(_ => IO.unit)
 
     BitVector.unfold(()) { _ => queue.dequeue1.unsafeRunSync.map { b => (b, ()) } }
