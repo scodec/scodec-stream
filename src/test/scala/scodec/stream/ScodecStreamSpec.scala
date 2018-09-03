@@ -2,7 +2,7 @@ package scodec.stream
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-import cats.effect.IO
+import cats.effect.{ContextShift, IO}
 import org.scalacheck._
 import Prop._
 import fs2.Stream
@@ -12,6 +12,8 @@ import scodec.codecs._
 import scodec.stream.{decode => D, encode => E}
 
 object ScodecStreamSpec extends Properties("scodec.stream") {
+
+  implicit val cs: ContextShift[IO] = IO.contextShift(global)
 
   property("many/tryMany") = {
     implicit val arbLong = Arbitrary(Gen.choose(1L,500L)) // chunk sizes
@@ -106,13 +108,13 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
     include(new Properties("fixed size") {
       property("strings") = forAll { (strings: List[String], chunkSize: Chunk) =>
         val bits = E.many(string).encodeAllValid(strings)
-        val chunks = Stream.emits(bits.grouped(chunkSize.get.toLong))
-        (chunks through D.pipe(string)).toList == strings
+        val chunks = Stream.emits(bits.grouped(chunkSize.get.toLong)).covary[IO]
+        (chunks through D.pipe[IO, String](implicitly, string)).compile.toList.unsafeRunSync == strings
       }
       property("ints") = forAll { (ints: List[Int], chunkSize: Chunk) =>
         val bits = E.many(int32).encodeAllValid(ints)
-        val chunks = Stream.emits(bits.grouped(chunkSize.get.toLong))
-        (chunks through D.pipe(int32)).toList == ints
+        val chunks = Stream.emits(bits.grouped(chunkSize.get.toLong)).covary[IO]
+        (chunks through D.pipe[IO, Int](implicitly, int32)).compile.toList.unsafeRunSync == ints
       }
     }, "process.")
   }

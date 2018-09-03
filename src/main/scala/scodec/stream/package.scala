@@ -1,8 +1,6 @@
 package scodec
 
-import scala.concurrent.ExecutionContext
-
-import cats.effect.IO
+import cats.effect.{ContextShift, IO}
 
 import fs2._
 import fs2.async.mutable.Queue
@@ -20,11 +18,11 @@ package object stream {
   val StreamCodec = scodec.stream.codec.StreamCodec
 
   /** Constructs a lazy `BitVector` by continuously reading from the supplied stream until it halts. */
-  def toLazyBitVector(in: Stream[IO, BitVector], bufferSize: Int = 100)(implicit ec: ExecutionContext): BitVector = {
+  def toLazyBitVector(in: Stream[IO, BitVector], bufferSize: Int = 100)(implicit cs: ContextShift[IO]): BitVector = {
     val queue = Queue.bounded[IO, Option[BitVector]](bufferSize).unsafeRunSync
 
     val fill: IO[Unit] = in.mask.noneTerminate.evalMap(queue.enqueue1).compile.drain
-    async.unsafeRunAsync(fill)(_ => IO.unit)
+    fill.start.unsafeRunAsync(_ => ())
 
     BitVector.unfold(()) { _ => queue.dequeue1.unsafeRunSync.map { b => (b, ()) } }
   }

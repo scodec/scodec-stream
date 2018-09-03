@@ -62,7 +62,7 @@ trait StreamDecoder[+A] { self =>
   final def decodeAsyncResource[F[_]: Effect,R](acquire: F[R])(
       read: R => BitVector,
       release: R => F[Unit]): Stream[F,A] = {
-    Stream.bracket(acquire)(read andThen { b => decode(b) }, release)
+    Stream.bracket(acquire)(release).flatMap(read andThen { b => decode(b) })
   }
 
   /**
@@ -182,7 +182,7 @@ trait StreamDecoder[+A] { self =>
   def nonEmpty(errIfEmpty: Err): StreamDecoder[A] =
     through { s =>
       s.pull.uncons.flatMap {
-        case None => Pull.raiseError(DecodingError(errIfEmpty))
+        case None => Pull.raiseError[Cursor](DecodingError(errIfEmpty))
         case Some((hd,tl)) => Pull.output(hd) >> tl.pull.echo
       }.stream
     }
@@ -202,10 +202,9 @@ trait StreamDecoder[+A] { self =>
     this.or(d)
 
   /**
-   * Transform the output of this `StreamDecoder` using the given
-   * single-input stream transducer.
+   * Transform the output of this `StreamDecoder` using the given pipe.
    */
-  final def through[B](p: Pipe[Pure,A,B]): StreamDecoder[B] =
+  final def through[B](p: Pipe[Cursor,A,B]): StreamDecoder[B] =
     edit { _ through p }
 
   /**
@@ -214,12 +213,12 @@ trait StreamDecoder[+A] { self =>
    */
   def sepBy[B](implicit B: Lazy[Decoder[B]]): StreamDecoder[A] = {
     through2(D.many[B]) { (value, delimiter) =>
-      def decodeValue(vs: Stream[Pure, A], ds: Stream[Pure, B]): Pull[Pure,A,Unit] =
+      def decodeValue(vs: Stream[Cursor, A], ds: Stream[Cursor, B]): Pull[Cursor,A,Unit] =
         vs.pull.uncons1.flatMap {
           case Some((v,vs1)) => Pull.output1(v) >> decodeDelimiter(vs1,ds)
           case None => Pull.done
         }
-      def decodeDelimiter(vs: Stream[Pure, A], ds: Stream[Pure, B]): Pull[Pure,A,Unit] =
+      def decodeDelimiter(vs: Stream[Cursor, A], ds: Stream[Cursor, B]): Pull[Cursor,A,Unit] =
         ds.pull.uncons1.flatMap {
           case Some((d,ds1)) => decodeValue(vs,ds1)
           case None => Pull.done
@@ -268,7 +267,7 @@ trait StreamDecoder[+A] { self =>
    * combinator is more useful for expressing alternation between two
    * decoders.
    */
-  final def through2[B,C](d: StreamDecoder[B])(t: Pipe2[Pure,A,B,C]): StreamDecoder[C] =
+  final def through2[B,C](d: StreamDecoder[B])(t: Pipe2[Cursor,A,B,C]): StreamDecoder[C] =
     edit { _.through2(d.decoder)(t) }
 
   /** Create a strict (i.e., non-stream) decoder. */

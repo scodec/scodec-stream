@@ -58,7 +58,9 @@ trait StreamEncoder[A] {
 
 object StreamEncoder {
 
-  type Step[A] = Stream[Pure, A] => Pull[Pure, BitVector, Option[(Stream[Pure, A], StreamEncoder[A])]]
+  type Step[A] = Stream[Pure, A] => Pull[Failable, BitVector, Option[(Stream[Pure, A], StreamEncoder[A])]]
+
+  type Failable[A] = Either[Throwable, A]
 
   def instance[A](step: Step[A]): StreamEncoder[A] =
     new StreamEncoder[A] { val encoder = step }

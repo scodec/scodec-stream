@@ -3,6 +3,7 @@ package stream
 
 import language.higherKinds
 
+import cats.ApplicativeError
 import fs2._
 import scodec.bits.BitVector
 
@@ -20,11 +21,11 @@ package object decode {
 
   /** The decoder that consumes no input and halts with the given error. */
   def raiseError(err: Throwable): StreamDecoder[Nothing] =
-    StreamDecoder.instance { Stream.raiseError(err) }
+    StreamDecoder.instance { Stream.raiseError[Cursor](err) }
 
   /** The decoder that consumes no input and halts with the given error. */
   def raiseError(err: Err): StreamDecoder[Nothing] =
-    StreamDecoder.instance { Stream.raiseError(DecodingError(err)) }
+    StreamDecoder.instance { Stream.raiseError[Cursor](DecodingError(err)) }
 
   /** The decoder that consumes no input, emits the given `a`, then halts. */
   def emit[A](a: A): StreamDecoder[A] =
@@ -128,16 +129,16 @@ package object decode {
    * satisfying this property will make results highly dependent on the sequence
    * of chunk sizes passed to the process.
    */
-  def pipe[F[_], A](implicit A: Lazy[Decoder[A]]): Pipe[F, BitVector, A] = {
+  def pipe[F[_], A](implicit F: ApplicativeError[F, Throwable], A: Lazy[Decoder[A]]): Pipe[F, BitVector, A] = {
 
     def waiting[I](remainder: BitVector)(s: Stream[F, BitVector]): Pull[F, A, Unit] = {
       s.pull.uncons1.flatMap {
         case None => Pull.done
         case Some((bits, tl)) =>
           consume(A.value)(remainder ++ bits, Vector.empty) match {
-            case (rem, out, err: Err.InsufficientBits) => Pull.outputChunk(Chunk.seq(out)) >> waiting(rem)(tl)
-            case (rem, Vector(), lastError) => Pull.raiseError(DecodingError(lastError))
-            case (rem, out, _) => Pull.outputChunk(Chunk.seq(out)) >> waiting(rem)(tl)
+            case (rem, out, err: Err.InsufficientBits) => Pull.output(Chunk.seq(out)) >> waiting(rem)(tl)
+            case (rem, Vector(), lastError) => Pull.raiseError[F](DecodingError(lastError))
+            case (rem, out, _) => Pull.output(Chunk.seq(out)) >> waiting(rem)(tl)
           }
       }
     }

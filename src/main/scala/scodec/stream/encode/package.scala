@@ -1,5 +1,6 @@
 package scodec.stream
 
+import cats.implicits._
 import scodec.{ Encoder, Err }
 import scodec.bits.BitVector
 import fs2._
@@ -10,11 +11,11 @@ package object encode {
 
   /** The encoder that consumes no input and halts with the given error. */
   def raiseError[A](err: Throwable): StreamEncoder[A] =
-    StreamEncoder.instance[A] { _ => Pull.raiseError(err) }
+    StreamEncoder.instance[A] { _ => Pull.raiseError[StreamEncoder.Failable](err) }
 
   /** The encoder that consumes no input and halts with the given error message. */
   def raiseError[A](err: Err): StreamEncoder[A] =
-    StreamEncoder.instance[A] { _ => Pull.raiseError(EncodingError(err)) }
+    StreamEncoder.instance[A] { _ => Pull.raiseError[StreamEncoder.Failable](EncodingError(err)) }
 
   /** The encoder that consumes no input and emits no values. */
   def empty[A]: StreamEncoder[A] =
@@ -30,7 +31,7 @@ package object encode {
       case None => Pull.pure(None)
       case Some((a, s1)) =>
         A.value.encode(a).fold(
-          e => Pull.raiseError(EncodingError(e)),
+          e => Pull.raiseError[StreamEncoder.Failable](EncodingError(e)),
           b => Pull.output1(b)
         ) >> Pull.pure(Some(s1 -> empty))
     }
