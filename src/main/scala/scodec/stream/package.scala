@@ -3,7 +3,7 @@ package scodec
 import cats.effect.{ContextShift, IO}
 
 import fs2._
-import fs2.async.mutable.Queue
+import fs2.concurrent.Queue
 
 import scodec.bits.BitVector
 
