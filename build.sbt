@@ -8,7 +8,7 @@ crossScalaVersions := crossScalaVersions.value.filterNot(_.startsWith("2.10.")).
 contributors ++= Seq(Contributor("mpilquist", "Michael Pilquist"), Contributor("pchiusano", "Paul Chiusano"))
 
 rootPackage := "scodec.stream"
-scmInfo := Some(ScmInfo(url("https://github.com/scodec/scodec-stream")
+scmInfo := Some(ScmInfo(url("https://github.com/scodec/scodec-stream")))
 
 libraryDependencies ++= Seq(
   "org.scodec" %% "scodec-core" % "1.10.3",
