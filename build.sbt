@@ -1,9 +1,9 @@
 scodecModule := "scodec-stream"
 
-scodecPrimaryModule
-scodecPrimaryModuleJvm
+enablePlugins(ScodecPrimaryModuleSettings)
+enablePlugins(ScodecPrimaryModuleJVMSettings)
 
-crossScalaVersions := crossScalaVersions.value.filterNot(_.startsWith("2.10."))
+crossScalaVersions := crossScalaVersions.value.filterNot(_.startsWith("2.10.")).filterNot(_.startsWith("2.13."))
 
 contributors ++= Seq(Contributor("mpilquist", "Michael Pilquist"), Contributor("pchiusano", "Paul Chiusano"))
 
