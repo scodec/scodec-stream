@@ -4,6 +4,7 @@ enablePlugins(ScodecPrimaryModuleSettings)
 enablePlugins(ScodecPrimaryModuleJVMSettings)
 
 crossScalaVersions := crossScalaVersions.value.filterNot(_.startsWith("2.10.")).filterNot(_.startsWith("2.13."))
+releaseCrossBuild := true
 
 contributors ++= Seq(Contributor("mpilquist", "Michael Pilquist"), Contributor("pchiusano", "Paul Chiusano"))
 
