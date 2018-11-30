@@ -8,14 +8,14 @@ cache:
 language: scala
 
 scala:
-  - 2.11.8
-  - 2.12.0
+  - 2.11.12
+  - 2.12.7
 
 jdk:
-  - oraclejdk8
+  - openjdk11
 
 script:
-  - sbt ++$TRAVIS_SCALA_VERSION test mima-report-binary-issues
+  - sbt ++$TRAVIS_SCALA_VERSION test mimaReportBinaryIssues
 
   # Tricks to avoid unnecessary cache updates
   - find $HOME/.sbt -name "*.lock" -exec rm {} +
