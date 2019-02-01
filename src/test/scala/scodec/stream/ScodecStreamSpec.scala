@@ -108,12 +108,12 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
     include(new Properties("fixed size") {
       property("strings") = forAll { (strings: List[String], chunkSize: Chunk) =>
         val bits = E.many(string).encodeAllValid(strings)
-        val chunks = Stream.emits(bits.grouped(chunkSize.get.toLong)).covary[IO]
+        val chunks = Stream.emits(bits.grouped(chunkSize.get.toLong).toSeq).covary[IO]
         (chunks through D.pipe[IO, String](implicitly, string)).compile.toList.unsafeRunSync == strings
       }
       property("ints") = forAll { (ints: List[Int], chunkSize: Chunk) =>
         val bits = E.many(int32).encodeAllValid(ints)
-        val chunks = Stream.emits(bits.grouped(chunkSize.get.toLong)).covary[IO]
+        val chunks = Stream.emits(bits.grouped(chunkSize.get.toLong).toSeq).covary[IO]
         (chunks through D.pipe[IO, Int](implicitly, int32)).compile.toList.unsafeRunSync == ints
       }
     }, "process.")
