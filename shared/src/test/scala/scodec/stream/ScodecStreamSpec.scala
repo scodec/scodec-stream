@@ -1,14 +1,14 @@
 package scodec.stream
 
 import scala.concurrent.ExecutionContext.Implicits.global
-
 import cats.effect.{ContextShift, IO}
 import org.scalacheck._
 import Prop._
 import fs2.Stream
 import scodec.bits.BitVector
-import scodec.{ Attempt, Decoder, Err }
+import scodec.{Attempt, Decoder, Err}
 import scodec.codecs._
+import scodec.stream.ScodecStreamSpec.string
 import scodec.stream.{decode => D, encode => E}
 
 object ScodecStreamSpec extends Properties("scodec.stream") {
@@ -103,20 +103,8 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
   }
 
   {
-    case class Chunk(get: Int)
     implicit val chunkSize = Arbitrary(Gen.choose(1,128).map(Chunk(_)))
-    include(new Properties("fixed size") {
-      property("strings") = forAll { (strings: List[String], chunkSize: Chunk) =>
-        val bits = E.many(string).encodeAllValid(strings)
-        val chunks = Stream.emits(bits.grouped(chunkSize.get.toLong).toSeq).covary[IO]
-        (chunks through D.pipe[IO, String](implicitly, string)).compile.toList.unsafeRunSync == strings
-      }
-      property("ints") = forAll { (ints: List[Int], chunkSize: Chunk) =>
-        val bits = E.many(int32).encodeAllValid(ints)
-        val chunks = Stream.emits(bits.grouped(chunkSize.get.toLong).toSeq).covary[IO]
-        (chunks through D.pipe[IO, Int](implicitly, int32)).compile.toList.unsafeRunSync == ints
-      }
-    }, "process.")
+    include(new FixedSizeProperties(), "process.")
   }
 
   property("toLazyBitVector") = {
@@ -130,5 +118,21 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
     val bv: BitVector = int32.encode(toEmit).require
     val e: StreamEncoder[Int] = E.emit[Int](bv)
     e.encode(Stream.emits(ints)).toList.foldLeft(BitVector.empty)(_ ++ _) == bv
+  }
+}
+
+case class Chunk(get: Int)
+
+// Has to be an outer class or Scala.JS complains
+class FixedSizeProperties(implicit chunkSizeArbitrary: Arbitrary[Chunk]) extends Properties("fixed size") {
+  property("strings") = forAll { (strings: List[String], chunkSize: Chunk) =>
+    val bits = E.many(string).encodeAllValid(strings)
+    val chunks = Stream.emits(bits.grouped(chunkSize.get.toLong).toSeq).covary[IO]
+    (chunks through D.pipe[IO, String](implicitly, string)).compile.toList.unsafeRunSync == strings
+  }
+  property("ints") = forAll { (ints: List[Int], chunkSize: Chunk) =>
+    val bits = E.many(int32).encodeAllValid(ints)
+    val chunks = Stream.emits(bits.grouped(chunkSize.get.toLong).toSeq).covary[IO]
+    (chunks through D.pipe[IO, Int](implicitly, int32)).compile.toList.unsafeRunSync == ints
   }
 }
