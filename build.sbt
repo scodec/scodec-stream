@@ -14,7 +14,7 @@ scmInfo := Some(ScmInfo(url("https://github.com/scodec/scodec-stream"), "git@git
 libraryDependencies ++= Seq(
   "org.scodec" %% "scodec-core" % "1.11.3",
   "co.fs2" %% "fs2-core" % "1.0.4",
-  "org.scalacheck" %% "scalacheck" % "1.13.5" % "test"
+  "org.scalacheck" %% "scalacheck" % "1.14.0" % "test"
 )
 
 libraryDependencies ++= {
