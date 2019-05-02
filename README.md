@@ -120,21 +120,29 @@ The representation of `StreamEncoder` means it can be used to transform the resu
 
 ```Scala
 import scodec.codecs
+import fs2.{Chunk,Stream}
 import scodec.stream.{encode,decode,StreamDecoder,StreamEncoder}
-import cats.effect.IO
+import cats.effect.{IO, Resource}
+import scala.concurrent.ExecutionContext
+import java.io.FileInputStream
+import java.util.concurrent.Executors
+
+private val blockingExecutionContext = 
+  Resource.make(IO(ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(2))))(ec => IO(ec.shutdown()))
 
 // skip first 64 bits, then decode
 val d: StreamDecoder[Int] = decode.advance(64) ++ decode.many(codecs.int32)
 val e: StreamEncoder[Int] = encode.many(codecs.int16)
 
-val t: IO[Unit] =
- e.encode { d.decodeMmap[IO](new FileInputStream("largefile.bin").getChannel) }
-  .map(bits => Chunk.bytes(bits.toByteArray))
-  .to(fs2.io.file.writeAll(java.nio.file.Paths.get("smallerfile.bin")))
-  .run
+val t: Stream[IO,Unit] = Stream.resource(blockingExecutionContext).flatMap(blockingEC ⇒
+  e.encode { d.decodeMmap[IO](new FileInputStream("largefile.bin").getChannel) }
+    .map(bits => Chunk.bytes(bits.toByteArray))
+    .flatMap(Stream.chunk)
+    .through(fs2.io.file.writeAll(java.nio.file.Paths.get("smallerfile.bin"),blockingEC))
+)
 
 // at the end of the universe
-t.unsafeRunSync
+t.compile.drain.unsafeRunSync()
 ```
 
-Calling `t.unsafeRunSync` will do a streaming decode of the `"largefile.bin"` file, skipping the first 64 bits, then a stream of signed 32 bit ints, which it downsamples to 16 bits and streams to the output file `"smallerfile.bin"`, raising an [`EncodingError`][enc-err] in the event of a format error or if an integer from the input fails to fit within 16 bits.
+Calling `t.compile.drain.unsafeRunSync` will do a streaming decode of the `"largefile.bin"` file, skipping the first 64 bits, then a stream of signed 32 bit ints, which it downsamples to 16 bits and streams to the output file `"smallerfile.bin"`, raising an [`EncodingError`][enc-err] in the event of a format error or if an integer from the input fails to fit within 16 bits.
