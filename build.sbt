@@ -22,8 +22,8 @@ scalacOptions --= {
 
 libraryDependencies ++= Seq(
   "org.scodec" %% "scodec-core" % "1.11.4",
-  "co.fs2" %% "fs2-core" % "1.1.0-M1",
-  "co.fs2" %% "fs2-io" % "1.1.0-M1" % "test",
+  "co.fs2" %% "fs2-core" % "1.1.0-SNAPSHOT",
+  "co.fs2" %% "fs2-io" % "1.1.0-SNAPSHOT" % "test",
   "org.scalacheck" %% "scalacheck" % "1.14.0" % "test"
 )
 

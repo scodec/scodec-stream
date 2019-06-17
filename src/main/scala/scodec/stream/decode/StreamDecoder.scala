@@ -2,8 +2,8 @@ package scodec.stream.decode
 
 import language.higherKinds
 
-import cats.~>
-import cats.effect.{ Sync, IO }
+import cats.{ ~>, ApplicativeError }
+import cats.effect.IO
 import fs2._
 import scala.util.control.NonFatal
 import scodec.{ Attempt, Decoder, DecodeResult, Err }
@@ -39,13 +39,13 @@ trait StreamDecoder[+A] { self =>
    * This function does not retain a reference to `bits`, allowing
    * it to be be garbage collected as the returned stream is traversed.
    */
-  final def decode[F[_]](bits: => BitVector)(implicit F: Sync[F]): Stream[F,A] = Stream.suspend {
+  final def decode[F[_]](bits: => BitVector)(implicit F: ApplicativeError[F, Throwable]): Stream[F,A] = Stream.suspend {
     @volatile var cur = bits // am pretty sure this doesn't need to be volatile, but just being safe
     decoder.translate(new (Cursor ~> F) {
-      def apply[X](c: Cursor[X]): F[X] = F.suspend {
+      def apply[X](c: Cursor[X]): F[X] = {
         c.run(cur).fold(
           msg => F.raiseError(DecodingError(msg)),
-          res => F.pure { cur = res.remainder; res.value }
+          res => { cur = res.remainder; F.pure(res.value) }
         )
       }
     })
@@ -54,8 +54,14 @@ trait StreamDecoder[+A] { self =>
   /**
    * Decode a stream of `BitVector` in to a stream of `A`.
    */
-  final def decodePipe[F[_]: Sync]: Pipe[F, BitVector, A] = in =>
+  final def decodePipe[F[_]](implicit F: ApplicativeError[F, Throwable]): Pipe[F, BitVector, A] = in =>
     in.flatMap(decode(_))
+
+  /**
+   * Decode a stream of `Byte` in to a stream of `A`.
+   */
+  final def decodePipeByte[F[_]](implicit F: ApplicativeError[F, Throwable]): Pipe[F, Byte, A] = in =>
+    in.chunks.map(_.toBitVector).through(decodePipe)
 
   /** Modify the `Stream[Cursor,A]` backing this `StreamDecoder`. */
   final def edit[B](f: Stream[Cursor, A] => Stream[Cursor, B]): StreamDecoder[B] =
