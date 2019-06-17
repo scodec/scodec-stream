@@ -3,22 +3,13 @@ scodecModule := "scodec-stream"
 enablePlugins(ScodecPrimaryModuleSettings)
 enablePlugins(ScodecPrimaryModuleJVMSettings)
 
-crossScalaVersions := crossScalaVersions.value.filterNot(_.startsWith("2.10."))
+crossScalaVersions := crossScalaVersions.value.filterNot(_.startsWith("2.10.")).filterNot(_.startsWith("2.13."))
 releaseCrossBuild := true
 
 contributors ++= Seq(Contributor("mpilquist", "Michael Pilquist"), Contributor("pchiusano", "Paul Chiusano"))
 
 rootPackage := "scodec.stream"
 scmInfo := Some(ScmInfo(url("https://github.com/scodec/scodec-stream"), "git@github.com:scodec/scodec-stream.git"))
-
-scalacOptions --= {
-  CrossVersion.partialVersion(scalaVersion.value) match {
-    case Some((2, v)) if v >= 13 =>
-      Seq("-Yno-adapted-args", "-Ywarn-unused-import")
-    case _ =>
-      Seq()
-  }
-}
 
 libraryDependencies ++= Seq(
   "org.scodec" %% "scodec-core" % "1.11.4",

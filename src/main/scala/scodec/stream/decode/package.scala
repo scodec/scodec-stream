@@ -174,7 +174,7 @@ package object decode {
           )
         }
         set(cur) ++ {
-          if (buf.nonEmpty) StreamDecoder.instance { Stream.chunk(Chunk.seq(buf)) } ++ tryManyChunked(chunkSize)
+          if (buf.nonEmpty) StreamDecoder.instance { Stream.emits(buf) } ++ tryManyChunked(chunkSize)
           else empty
         }
       }
@@ -224,7 +224,7 @@ package object decode {
         )
       }
       set(cur) ++ {
-        if (buf.nonEmpty) StreamDecoder.instance { Stream.chunk(Chunk.seq(buf)) } ++ manyChunked(chunkSize)
+        if (buf.nonEmpty) StreamDecoder.instance { Stream.emits(buf) } ++ manyChunked(chunkSize)
         else empty
       }
     }
