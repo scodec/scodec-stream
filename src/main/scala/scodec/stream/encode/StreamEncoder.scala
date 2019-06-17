@@ -27,7 +27,7 @@ trait StreamEncoder[A] {
         case None => Pull.pure(None)
       }
     }
-    go(in, this).void.stream
+    go(in, this).stream
   }
 
   /** Modify the `Pull` backing this `StreamEncoder`. */
