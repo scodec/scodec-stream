@@ -12,8 +12,9 @@ rootPackage := "scodec.stream"
 scmInfo := Some(ScmInfo(url("https://github.com/scodec/scodec-stream"), "git@github.com:scodec/scodec-stream.git"))
 
 libraryDependencies ++= Seq(
-  "org.scodec" %% "scodec-core" % "1.11.3",
-  "co.fs2" %% "fs2-core" % "1.0.5",
+  "org.scodec" %% "scodec-core" % "1.11.4",
+  "co.fs2" %% "fs2-core" % "1.1.0-M1",
+  "co.fs2" %% "fs2-io" % "1.1.0-M1" % "test",
   "org.scalacheck" %% "scalacheck" % "1.14.0" % "test"
 )
 

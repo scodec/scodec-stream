@@ -2,10 +2,8 @@ package scodec.stream.decode
 
 import language.higherKinds
 
-import java.io.InputStream
-import java.nio.channels.{ FileChannel, ReadableByteChannel }
 import cats.~>
-import cats.effect.{ Effect, IO }
+import cats.effect.{ Sync, IO }
 import fs2._
 import scala.util.control.NonFatal
 import scodec.{ Attempt, Decoder, DecodeResult, Err }
@@ -37,11 +35,11 @@ trait StreamDecoder[+A] { self =>
     decode[IO](bits).compile.toVector.unsafeRunSync
 
   /**
-   * Decoding a stream of `A` values from the given `BitVector`.
+   * Decode a stream of `A` values from the given `BitVector`.
    * This function does not retain a reference to `bits`, allowing
    * it to be be garbage collected as the returned stream is traversed.
    */
-  final def decode[F[_]](bits: => BitVector)(implicit F: Effect[F]): Stream[F,A] = Stream.suspend {
+  final def decode[F[_]](bits: => BitVector)(implicit F: Sync[F]): Stream[F,A] = Stream.suspend {
     @volatile var cur = bits // am pretty sure this doesn't need to be volatile, but just being safe
     decoder.translate(new (Cursor ~> F) {
       def apply[X](c: Cursor[X]): F[X] = F.suspend {
@@ -52,64 +50,12 @@ trait StreamDecoder[+A] { self =>
       }
     })
   }
-
+  
   /**
-   * Resource-safe version of `decode`. Acquires a resource,
-   * decodes a stream of values, and releases the resource when
-   * the returned `Stream[F,A]` is finished being consumed.
-   * The `acquire` and `release` actions may be asynchronous.
+   * Decode a stream of `BitVector` in to a stream of `A`.
    */
-  final def decodeAsyncResource[F[_]: Effect,R](acquire: F[R])(
-      read: R => BitVector,
-      release: R => F[Unit]): Stream[F,A] = {
-    Stream.bracket(acquire)(release).flatMap(read andThen { b => decode(b) })
-  }
-
-  /**
-   * Resource-safe version of `decode`. Acquires a resource,
-   * decodes a stream of values, and releases the resource when
-   * the returned `Stream[F,A]` is finished being consumed.
-   * If the `acquire` and `release` actions are asynchronous, use
-   * [[decodeAsyncResource]].
-   */
-  final def decodeResource[F[_],R](acquire: => R)(
-      read: R => BitVector,
-      release: R => Unit)(implicit F: Effect[F]): Stream[F,A] =
-    decodeAsyncResource(F.delay(acquire))(read, r => F.delay(release(r)))
-
-  /**
-   * Resource-safe version of `decode` for an `InputStream` resource.
-   * This is just a convenience function which calls [[decodeResource]], using
-   * `scodec.bits.BitVector.fromInputStream` as the `read` function, and which
-   * closes `in` after the returned `Stream[F,A]` is consumed.
-   */
-  final def decodeInputStream[F[_]:Effect](
-      in: => InputStream,
-      chunkSizeInBytes: Int = 1024 * 1000 * 16): Stream[F,A] =
-    decodeResource(in)(BitVector.fromInputStream(_, chunkSizeInBytes), _.close)
-
-  /**
-   * Resource-safe version of `decode` for a `ReadableByteChannel` resource.
-   * This is just a convenience function which calls [[decodeResource]], using
-   * `scodec.bits.BitVector.fromChannel` as the `read` function, and which
-   * closes `in` after the returned `Stream[F,A]` is consumed.
-   */
-  final def decodeChannel[F[_]: Effect](
-      in: => ReadableByteChannel,
-      chunkSizeInBytes: Int = 1024 * 1000 * 16,
-      direct: Boolean = false): Stream[F,A] =
-    decodeResource(in)(BitVector.fromChannel(_, chunkSizeInBytes, direct), _.close)
-
-  /**
-   * Resource-safe version of `decode` for a `ReadableByteChannel` resource.
-   * This is just a convenience function which calls [[decodeResource]], using
-   * `scodec.bits.BitVector.fromChannel` as the `read` function, and which
-   * closes `in` after the returned `Stream[F,A]` is consumed.
-   */
-  final def decodeMmap[F[_]: Effect](
-      in: => FileChannel,
-      chunkSizeInBytes: Int = 1024 * 1000 * 16): Stream[F,A] =
-    decodeResource(in)(BitVector.fromMmap(_, chunkSizeInBytes), _.close)
+  final def decodePipe[F[_]: Sync]: Pipe[F, BitVector, A] = in =>
+    in.flatMap(decode(_))
 
   /** Modify the `Stream[Cursor,A]` backing this `StreamDecoder`. */
   final def edit[B](f: Stream[Cursor, A] => Stream[Cursor, B]): StreamDecoder[B] =
