@@ -80,6 +80,22 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
     D.many(int32).sepBy(string).decodeAllValid(encoded).toList ?= ints
   }
 
+  property("decodeResource") = forAll { (strings: List[String]) =>
+    // make sure that cleanup action gets run
+    import scodec.stream.{encode => E}
+    val bits = E.once(string).many.encodeAllValid(strings)
+    var cleanedUp = 0
+    val decoded = D.many(string).decodeResource[IO,Unit](())(_ => bits, _ => cleanedUp += 1)
+    cleanedUp == 0 && // make sure we don't bump this strictly
+    decoded.compile.toVector.unsafeRunSync.toList == strings && // normal termination
+    decoded.take(2).compile.toVector.unsafeRunSync.toList == strings.take(2) && // early termination
+    { // exceptions
+      val failed = decoded.take(3).map(_ => sys.error("die")).compile.toVector.attempt.unsafeRunSync.isLeft
+      strings.isEmpty || failed
+    } &&
+    cleanedUp == 3
+  }
+
   property("peek") = forAll { (strings: List[String]) =>
     val bits = E.once(string).many.encodeAllValid(strings)
     val d = D.many(string).peek ++ D.many(string)
@@ -87,18 +103,17 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
   }
 
   {
-    val genChunkSize = Gen.choose(1L, 128L)
+    case class Chunk(get: Int)
+    implicit val chunkSize = Arbitrary(Gen.choose(1,128).map(Chunk(_)))
     include(new Properties("fixed size") {
-      val genSmallListOfString = Gen.choose(0, 10).flatMap(n => Gen.listOfN(n, Gen.alphaStr))
-      property("strings") = forAll(genSmallListOfString, genChunkSize) { (strings: List[String], chunkSize: Long) =>
+      property("strings") = forAll { (strings: List[String], chunkSize: Chunk) =>
         val bits = E.many(string).encodeAllValid(strings)
-        val chunks = Stream.emits(bits.grouped(chunkSize).toSeq).covary[IO]
+        val chunks = Stream.emits(bits.grouped(chunkSize.get.toLong).toSeq).covary[IO]
         (chunks through D.pipe[IO, String](implicitly, string)).compile.toList.unsafeRunSync == strings
       }
-      val genSmallListOfInt = Gen.choose(0, 10).flatMap(n => Gen.listOfN(n, Arbitrary.arbitrary[Int]))
-      property("ints") = forAll(genSmallListOfInt, genChunkSize) { (ints: List[Int], chunkSize: Long) =>
+      property("ints") = forAll { (ints: List[Int], chunkSize: Chunk) =>
         val bits = E.many(int32).encodeAllValid(ints)
-        val chunks = Stream.emits(bits.grouped(chunkSize).toSeq).covary[IO]
+        val chunks = Stream.emits(bits.grouped(chunkSize.get.toLong).toSeq).covary[IO]
         (chunks through D.pipe[IO, Int](implicitly, int32)).compile.toList.unsafeRunSync == ints
       }
     }, "process.")
