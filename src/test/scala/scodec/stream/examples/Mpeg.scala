@@ -2,7 +2,7 @@ package scodec.stream.examples
 
 import scala.concurrent.duration._
 
-import cats.effect.IO
+import cats.effect.{Blocker, ContextShift, IO}
 
 import scodec.bits._
 import scodec._
@@ -10,7 +10,7 @@ import scodec.stream._
 
 import fs2._
 
-import java.io.{ File, FileInputStream }
+import java.nio.file.Paths
 
 object Mpeg extends App {
   import PcapCodec._
@@ -51,13 +51,22 @@ object Mpeg extends App {
     println(s"$label took ${(stop.toDouble-start) / 1000.0} s")
     result
   }
-  def channel = new FileInputStream(new File("path/to/file")).getChannel
-  val result2 = time("coarse-grained") { streamThroughRecordsOnly.decodeMmap[IO](channel).compile.fold(0)((acc, _) => acc + 1).unsafeRunSync }
-  val result1 = time("fine-grained") { streamier.decodeMmap[IO](channel).compile.fold(0)((acc, _) => acc + 1).unsafeRunSync }
+
+  implicit val csIO: ContextShift[IO] = IO.contextShift(scala.concurrent.ExecutionContext.Implicits.global)
+
+  val filePath = Paths.get("path/to/file")
+
+  def countElements(decoder: StreamDecoder[_]): IO[Int] =
+    Stream.resource(Blocker[IO]).flatMap { blocker =>
+      fs2.io.file.readAll[IO](filePath, blocker, 4096).chunks.map(c => BitVector.view(c.toArray)).through(streamThroughRecordsOnly.decodePipe)
+    }.compile.fold(0)((acc, _) => acc + 1)
+
+  val result2 = time("coarse-grained") { countElements(streamThroughRecordsOnly).unsafeRunSync }
+  val result1 = time("fine-grained") { countElements(streamier).unsafeRunSync }
+
   println("fine-grained stream packet count: " + result1)
   println("coarse-grained stream packet count: " + result2)
 }
-
 
 /**
  * Processes libpcap files.

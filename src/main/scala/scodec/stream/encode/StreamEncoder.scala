@@ -2,7 +2,6 @@ package scodec.stream.encode
 
 import language.higherKinds
 
-import cats.effect.IO
 import fs2._
 import scodec.bits.BitVector
 
@@ -18,7 +17,7 @@ trait StreamEncoder[A] {
    * in the event of an encoding error.
    */
   def encodeAllValid(in: Seq[A]): BitVector =
-    encode(Stream.emits(in)).covary[IO].compile.fold(BitVector.empty)(_ ++ _).unsafeRunSync
+    encode(Stream.emits(in)).compile.fold(BitVector.empty)(_ ++ _)
 
   /** Encode the input stream of `A` values using this `StreamEncoder`. */
   final def encode[F[_]](in: Stream[F, A]): Stream[F, BitVector] = {
@@ -28,7 +27,7 @@ trait StreamEncoder[A] {
         case None => Pull.pure(None)
       }
     }
-    go(in, this).stream
+    go(in, this).void.stream
   }
 
   /** Modify the `Pull` backing this `StreamEncoder`. */
