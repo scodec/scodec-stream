@@ -18,28 +18,28 @@ object Mpeg extends App {
 
   val streamThroughRecordsOnly: StreamDecoder[MpegPacket] = {
     val pcapRecordStreamDecoder: StreamDecoder[PcapRecord] =
-      decode.once[PcapHeader].flatMap { header =>
-        decode.many(pcapRecord(header.ordering))
+      StreamDecoder.once(pcapHeader).flatMap { header =>
+        StreamDecoder.many(pcapRecord(header.ordering))
       }
 
-    val mpegPcapDecoder: StreamDecoder[MpegPacket] = pcapRecordStreamDecoder flatMapS { record =>
+    val mpegPcapDecoder: StreamDecoder[MpegPacket] = pcapRecordStreamDecoder.flatMap { record =>
       // Drop 22 byte ethernet frame header and 20 byte IPv4/udp header
       val datagramPayloadBits = record.data.drop(22 * 8).drop(20 * 8)
       val packets = codecs.vector(Codec[MpegPacket]).decode(datagramPayloadBits).map { _.value }
-      Stream.emits(packets.getOrElse(Seq.empty))
+      packets.fold(e => StreamDecoder.raiseError(CodecError(e)), StreamDecoder.emits(_))
     }
 
     mpegPcapDecoder
   }
 
   val streamier: StreamDecoder[MpegPacket] = for {
-    header <- decode.once[PcapHeader]
-    packet <- decode.many(pcapRecordHeader(header.ordering)) flatMap { recordHeader =>
-      decode.isolate(recordHeader.includedLength * 8) {
+    header <- StreamDecoder.once(pcapHeader)
+    packet <- StreamDecoder.many(pcapRecordHeader(header.ordering)).flatMap { recordHeader =>
+      StreamDecoder.isolate(recordHeader.includedLength * 8) {
         // Drop 22 byte ethernet frame header and 20 byte IPv4/udp header
-        decode.advance((22 + 20) * 8) ++
+        StreamDecoder.ignore((22 + 20) * 8) ++
         // bail on this record if we fail to parse an `MpegPacket` from it
-        decode.tryMany[MpegPacket]
+        StreamDecoder.tryMany(mpegPacket)
       }
     }
   } yield packet
@@ -58,7 +58,7 @@ object Mpeg extends App {
 
   def countElements(decoder: StreamDecoder[_]): IO[Int] =
     Stream.resource(Blocker[IO]).flatMap { blocker =>
-      fs2.io.file.readAll[IO](filePath, blocker, 4096).chunks.map(c => BitVector.view(c.toArray)).through(streamThroughRecordsOnly.decodePipe)
+      fs2.io.file.readAll[IO](filePath, blocker, 4096).chunks.map(c => BitVector.view(c.toArray)).through(streamThroughRecordsOnly.toPipe)
     }.compile.fold(0)((acc, _) => acc + 1)
 
   val result2 = time("coarse-grained") { countElements(streamThroughRecordsOnly).unsafeRunSync }
