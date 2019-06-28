@@ -3,6 +3,7 @@ package scodec.stream
 import org.scalacheck._
 import Prop._
 import fs2.{ Fallible, Stream }
+import scodec.Err
 import scodec.bits._
 import scodec.codecs._
 
@@ -57,5 +58,9 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
     val bv: BitVector = int32.encode(toEmit).require
     val e: StreamEncoder[Int] = StreamEncoder.emit[Int](bv)
     e.encode(Stream.emits(ints).covary[Fallible]).compile.fold(BitVector.empty)(_ ++ _) == Right(bv)
+  }
+
+  property("encode.tryOnce") = secure {
+    (StreamEncoder.tryOnce(fail[Int](Err("error"))) ++ StreamEncoder.many(int8)).encode(Stream(1, 2).covary[Fallible]).toList == Right(List(hex"01".bits, hex"02".bits))
   }
 }

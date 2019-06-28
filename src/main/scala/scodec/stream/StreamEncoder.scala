@@ -20,18 +20,21 @@ final class StreamEncoder[A](private val step: StreamEncoder.Step[A]) { self =>
     encode[Fallible](Stream.emits(in)).compile[Fallible, ET, BitVector].fold(BitVector.empty)(_ ++ _).fold(e => throw e, identity)
   }
 
-  /** Encode the input stream of `A` values using this `StreamEncoder`. */
+  /** Encodes the supplied stream of `A` values in to a stream of `BitVector`. */
   def toPipe[F[_]: RaiseThrowable]: Pipe[F, A, BitVector] = in => encode(in)
 
-  /** Encode the input stream of `A` values using this `StreamEncoder`. */
-  def encode[F[_]: RaiseThrowable](in: Stream[F, A]): Stream[F, BitVector] = {
-    def go(s: Stream[F, A], encoder: StreamEncoder[A]): Pull[F, BitVector, Option[(Stream[F, A], StreamEncoder[A])]] = {
+  /** Encodes the supplied stream of `A` values in to a stream of `BitVector`. */
+  def encode[F[_]: RaiseThrowable](in: Stream[F, A]): Stream[F, BitVector] =
+    apply(in).void.stream
+
+  private def apply[F[_]: RaiseThrowable](in: Stream[F, A]): Pull[F, BitVector, Option[(Stream[F, A], StreamEncoder[A])]] = {
+    def loop(s: Stream[F, A], encoder: StreamEncoder[A]): Pull[F, BitVector, Option[(Stream[F, A], StreamEncoder[A])]] = {
       encoder.step[F](s) flatMap {
-        case Some((s, next)) => go(s, next)
+        case Some((s, next)) => loop(s, next)
         case None => Pull.pure(None)
       }
     }
-    go(in, this).void.stream
+    loop(in, this)
   }
 
   private def or(other: StreamEncoder[A]): StreamEncoder[A] = new StreamEncoder[A](
@@ -44,15 +47,18 @@ final class StreamEncoder[A](private val step: StreamEncoder.Step[A]) { self =>
     }
   )
 
-  /** Run this `StreamEncoder`, followed by `e`. */
-  def ++(e: => StreamEncoder[A]): StreamEncoder[A] = new StreamEncoder[A](
+  /**
+   * Creates a stream encoder that first encodes with this encoder and then when complete,
+   * encodes the remainder with the supplied encoder.
+   */
+  def ++(that: => StreamEncoder[A]): StreamEncoder[A] = new StreamEncoder[A](
     new StreamEncoder.Step[A] {
       def apply[F[_]: RaiseThrowable](s: Stream[F,A]): Pull[F,BitVector,Option[(Stream[F,A], StreamEncoder[A])]] =
-        self.step(s).map { _.map { case (s1, next) => (s1, next or e) }}
+        self.step(s).map { _.map { case (s1, next) => (s1, next or that) }}
     }
   )
 
-  /** Encode values as long as there are more inputs. */
+  /** Encodes values as long as there are more inputs. */
   def repeat: StreamEncoder[A] = this ++ repeat
 
   /** Transform the input type of this `StreamEncoder`. */
@@ -66,26 +72,17 @@ final class StreamEncoder[A](private val step: StreamEncoder.Step[A]) { self =>
 
 object StreamEncoder {
 
-  private[StreamEncoder] trait Step[A] {
+  private trait Step[A] {
     def apply[F[_]: RaiseThrowable](s: Stream[F, A]): Pull[F, BitVector, Option[(Stream[F, A], StreamEncoder[A])]]
   }
 
-  /** The encoder that consumes no input and halts with the given error. */
-  def raiseError[A](err: Throwable): StreamEncoder[A] = new StreamEncoder[A](new Step[A] {
-    def apply[F[_]: RaiseThrowable](s: Stream[F,A]): Pull[F,BitVector,Option[(Stream[F,A], StreamEncoder[A])]] =
-      Pull.raiseError(err)
-  })
-
-  /** The encoder that consumes no input and halts with the given error message. */
-  def raiseError[A](err: Err): StreamEncoder[A] = raiseError(CodecError(err))
-
-  /** The encoder that consumes no input and emits no values. */
+  /** Creates a stream encoder that consumes no values and emits no bits. */
   def empty[A]: StreamEncoder[A] = new StreamEncoder[A](new Step[A] {
     def apply[F[_]: RaiseThrowable](s: Stream[F,A]): Pull[F,BitVector,Option[(Stream[F,A], StreamEncoder[A])]] =
       Pull.pure(None)
   })
 
-  /** A `StreamEncoder` which encodes a single value, then halts. */
+  /** Creates a stream encoder that encodes a single value of input using the supplied encoder. */
   def once[A](encoder: Encoder[A]): StreamEncoder[A] = new StreamEncoder[A](new Step[A] {
     def apply[F[_]: RaiseThrowable](s: Stream[F,A]): Pull[F,BitVector,Option[(Stream[F,A], StreamEncoder[A])]] =
       s.pull.uncons1.flatMap {
@@ -98,17 +95,12 @@ object StreamEncoder {
       }
   })
 
+  /** Creates a stream encoder that encodes all input values using the supplied encoder. */
   def many[A](encoder: Encoder[A]): StreamEncoder[A] = once(encoder).repeat
 
-  /** A `StreamEncoder` that emits the given `BitVector`, then halts. */
-  def emit[A](bits: BitVector): StreamEncoder[A] = new StreamEncoder[A](new Step[A] {
-    def apply[F[_]: RaiseThrowable](s: Stream[F,A]): Pull[F,BitVector,Option[(Stream[F,A], StreamEncoder[A])]] =
-      Pull.output1(bits) >> Pull.pure(Some(s -> empty[A]))
-  })
-
   /**
-   * A `StreamEncoder` which encodes a single value, then halts.
-   * Unlike `once`, encoding failures are converted to normal termination.
+   * Creates a stream encoder which encodes a single value, then halts.
+   * Unlike `once`, if an encoding failure occurs, the resulting stream is not terminated.
    */
   def tryOnce[A](encoder: Encoder[A]): StreamEncoder[A] = new StreamEncoder[A](new Step[A] {
     def apply[F[_]: RaiseThrowable](s: Stream[F,A]): Pull[F,BitVector,Option[(Stream[F,A], StreamEncoder[A])]] =
@@ -116,9 +108,32 @@ object StreamEncoder {
         case None => Pull.pure(None)
         case Some((a, s1)) =>
           encoder.encode(a).fold(
-            e => Pull.pure(Some(s1 -> empty)),
+            e => Pull.pure(Some(s1.cons1(a) -> empty)),
             b => Pull.output1(b) >> Pull.pure(Some(s1 -> empty))
           )
       }
   })
+
+  /**
+   * Creates a stream encoder which encodes all input values, then halts.
+   * Unlike `many`, if an encoding failure occurs, the resulting stream is not terminated.
+   */
+  def tryMany[A](encoder: Encoder[A]): StreamEncoder[A] = tryOnce(encoder).repeat
+
+  /** Creates a stream encoder that emits the given `BitVector`, then halts. */
+  def emit[A](bits: BitVector): StreamEncoder[A] = new StreamEncoder[A](new Step[A] {
+    def apply[F[_]: RaiseThrowable](s: Stream[F,A]): Pull[F,BitVector,Option[(Stream[F,A], StreamEncoder[A])]] =
+      Pull.output1(bits) >> Pull.pure(Some(s -> empty[A]))
+  })
+
+  /** The encoder that consumes no input and halts with the given error. */
+  def raiseError[A](err: Throwable): StreamEncoder[A] = new StreamEncoder[A](new Step[A] {
+    def apply[F[_]: RaiseThrowable](s: Stream[F,A]): Pull[F,BitVector,Option[(Stream[F,A], StreamEncoder[A])]] =
+      Pull.raiseError(err)
+  })
+
+  /** The encoder that consumes no input and halts with the given error message. */
+  def raiseError[A](err: Err): StreamEncoder[A] = raiseError(CodecError(err))
+
+
 }
