@@ -89,7 +89,9 @@ final class StreamDecoder[+A](private val step: StreamDecoder.Step[A]) { self =>
     }
 
   /**
-   * Creates a stream decoder that
+   * Creates a stream decoder that, upon decoding an `A`, applies it to the supplied function and decodes
+   * the next part of the input with the returned decoder. When that decoder finishes, the remainder of
+   * the input is returned to the original decoder for further decoding.
    */
   def flatMap[B](f: A => StreamDecoder[B]): StreamDecoder[B] = new StreamDecoder[B](
     self.step match {
@@ -102,6 +104,7 @@ final class StreamDecoder[+A](private val step: StreamDecoder.Step[A]) { self =>
     }
   )
 
+  /** Maps the supplied function over each output of this decoder. */
   def map[B](f: A => B): StreamDecoder[B] = flatMap(a => StreamDecoder.emit(f(a)))
 
   /**
