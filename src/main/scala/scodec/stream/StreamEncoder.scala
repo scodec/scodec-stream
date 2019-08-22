@@ -20,8 +20,13 @@ final class StreamEncoder[A](private val step: StreamEncoder.Step[A]) { self =>
     encode[Fallible](Stream.emits(in)).compile[Fallible, ET, BitVector].fold(BitVector.empty)(_ ++ _).fold(e => throw e, identity)
   }
 
-  /** Encodes the supplied stream of `A` values in to a stream of `BitVector`. */
-  def toPipe[F[_]: RaiseThrowable]: Pipe[F, A, BitVector] = in => encode(in)
+  /** Converts this encoder to a `Pipe[F, A, BitVector]`. */
+  def toPipe[F[_]: RaiseThrowable]: Pipe[F, A, BitVector] = 
+    in => encode(in)
+
+ /** Converts this encoder to a `Pipe[F, A, Byte]`. */
+  def toPipeByte[F[_]: RaiseThrowable]: Pipe[F, A, Byte] =
+    in => encode(in).flatMap(bits => Stream.chunk(Chunk.byteVector(bits.bytes)))
 
   /** Encodes the supplied stream of `A` values in to a stream of `BitVector`. */
   def encode[F[_]: RaiseThrowable](in: Stream[F, A]): Stream[F, BitVector] =
