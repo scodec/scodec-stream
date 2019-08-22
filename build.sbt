@@ -10,6 +10,15 @@ contributors ++= Seq(Contributor("mpilquist", "Michael Pilquist"), Contributor("
 
 rootPackage := "scodec.stream"
 scmInfo := Some(ScmInfo(url("https://github.com/scodec/scodec-stream"), "git@github.com:scodec/scodec-stream.git"))
+ 
+scalacOptions ++= {
+  CrossVersion.partialVersion(scalaVersion.value) match {
+    case Some((2, v)) if v >= 13 =>
+      Seq()
+    case _ =>
+      Seq("-Ypartial-unification")
+  }
+}
 
 scalacOptions --= {
   CrossVersion.partialVersion(scalaVersion.value) match {
