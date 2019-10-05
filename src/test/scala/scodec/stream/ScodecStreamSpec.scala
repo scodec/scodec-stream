@@ -22,7 +22,8 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
   property("many/tryMany-insufficient") = secure {
     val bits = hex"00000001 00000002 0000".bits
     StreamDecoder.many(int32).decode[Fallible](Stream(bits)).toList == Right(List(1, 2))
-      StreamDecoder.tryMany(int32).decode[Fallible](Stream(bits)).toList == Right(List(1, 2))
+    StreamDecoder.manyComplete(int32).decode[Fallible](Stream(bits)).toList == Left(CodecError(Err.InsufficientBits(32, 16, Nil)))
+    StreamDecoder.tryMany(int32).decode[Fallible](Stream(bits)).toList == Right(List(1, 2))
   }
 
   property("tryMany-example") = secure {
@@ -63,4 +64,11 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
   property("encode.tryOnce") = secure {
     (StreamEncoder.tryOnce(fail[Int](Err("error"))) ++ StreamEncoder.many(int8)).encode(Stream(1, 2).covary[Fallible]).toList == Right(List(hex"01".bits, hex"02".bits))
   }
+
+  property("once-insufficient") = secure {
+    val bits = hex"0000".bits
+    StreamDecoder.once(int32).decode[Fallible](Stream(bits)).toList == Left(Nil)
+    StreamDecoder.onceComplete(int32).decode[Fallible](Stream(bits)).toList == Left(CodecError(Err.InsufficientBits(32, 16, Nil)))
+  }
+
 }

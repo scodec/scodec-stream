@@ -50,8 +50,8 @@ final class StreamDecoder[+A](private val step: StreamDecoder.Step[A]) { self =>
         case Some(rem) => y()(rem)
       }
 
-      case Decode(decoder, once, failOnErr) =>
-        def loop(carry: BitVector, s: Stream[F, BitVector]): Pull[F, A, Option[Stream[F, BitVector]]] = {
+      case Decode(decoder, once, failOnErr, failOnPrematureEos) =>
+        def loop(carry: BitVector, s: Stream[F, BitVector], carryErr: Option[Err]): Pull[F, A, Option[Stream[F, BitVector]]] = {
           s.pull.uncons1.flatMap {
             case Some((hd, tl)) =>
               val buffer = carry ++ hd
@@ -60,19 +60,19 @@ final class StreamDecoder[+A](private val step: StreamDecoder.Step[A]) { self =>
                   val next = if (remainder.isEmpty) tl else tl.cons1(remainder)
                   val p = value(next)
                   if (once) p else p.flatMap {
-                    case Some(next) => loop(BitVector.empty, next)
+                    case Some(next) => loop(BitVector.empty, next, None)
                     case None => Pull.pure(None)
                   }
                 case Attempt.Failure(e: Err.InsufficientBits) =>
-                  loop(buffer, tl)
+                  loop(buffer, tl, Some(e))
                 case Attempt.Failure(e) =>
                   if (failOnErr) Pull.raiseError(CodecError(e))
                   else Pull.pure(Some(Stream(buffer)))
               }
-            case None => if (carry.isEmpty) Pull.pure(None) else Pull.pure(Some(Stream(carry)))
+            case None => if (carry.isEmpty) Pull.pure(None) else if (failOnPrematureEos) Pull.raiseError(CodecError(carryErr.getOrElse(Err("unexpected end of input")))) else Pull.pure(Some(Stream(carry)))
           }
         }
-        loop(BitVector.empty, s)
+        loop(BitVector.empty, s, None)
 
       case Isolate(bits, decoder) =>
         def loop(carry: BitVector, s: Stream[F, BitVector]): Pull[F, A, Option[Stream[F, BitVector]]] = {
@@ -98,7 +98,7 @@ final class StreamDecoder[+A](private val step: StreamDecoder.Step[A]) { self =>
       case Empty => Empty
       case Result(a) => f(a).step
       case Failed(cause) => Failed(cause)
-      case Decode(g, once, failOnErr) => Decode(in => g(in).map(_.map(_.flatMap(f))), once, failOnErr)
+      case Decode(g, once, failOnErr, failOnPrematureEos) => Decode(in => g(in).map(_.map(_.flatMap(f))), once, failOnErr, failOnPrematureEos)
       case Isolate(bits, decoder) => Isolate(bits, decoder.flatMap(f))
       case Append(x, y) => Append(x.flatMap(f), () => y().flatMap(f))
     }
@@ -148,7 +148,7 @@ object StreamDecoder {
   private final case object Empty extends Step[Nothing]
   private final case class Result[A](value: A) extends Step[A]
   private final case class Failed(cause: Throwable) extends Step[Nothing]
-  private final case class Decode[A](f: BitVector => Attempt[DecodeResult[StreamDecoder[A]]], once: Boolean, failOnErr: Boolean) extends Step[A]
+  private final case class Decode[A](f: BitVector => Attempt[DecodeResult[StreamDecoder[A]]], once: Boolean, failOnErr: Boolean, failOnPrematureEos: Boolean) extends Step[A]
   private final case class Isolate[A](bits: Long, decoder: StreamDecoder[A]) extends Step[A]
   private final case class Append[A](x: StreamDecoder[A], y: () => StreamDecoder[A]) extends Step[A]
 
@@ -167,13 +167,28 @@ object StreamDecoder {
    * Input bits are buffered until the decoder is able to decode an `A`.
    */
   def once[A](decoder: Decoder[A]): StreamDecoder[A] =
-    new StreamDecoder[A](Decode(in => decoder.decode(in).map(_.map(emit)), once = true, failOnErr = true))
+    new StreamDecoder[A](Decode(in => decoder.decode(in).map(_.map(emit)), once = true, failOnErr = true, failOnPrematureEos = false))
 
   /**
    * Creates a stream decoder that repeatedly decodes `A` values using the supplied decoder. 
    */
   def many[A](decoder: Decoder[A]): StreamDecoder[A] =
-    new StreamDecoder[A](Decode(in => decoder.decode(in).map(_.map(emit)), once = false, failOnErr = true))
+    new StreamDecoder[A](Decode(in => decoder.decode(in).map(_.map(emit)), once = false, failOnErr = true, failOnPrematureEos = false))
+
+  /**
+   * Creates a stream decoder that decodes one `A` using the supplied decoder.
+   * Input bits are buffered until the decoder is able to decode an `A`.
+   * Stream fails if input ends while decoding the element.
+   */
+  def onceComplete[A](decoder: Decoder[A]): StreamDecoder[A] =
+    new StreamDecoder[A](Decode(in => decoder.decode(in).map(_.map(emit)), once = true, failOnErr = true, failOnPrematureEos = true))
+
+  /**
+   * Creates a stream decoder that repeatedly decodes `A` values using the supplied decoder.
+   * Stream fails if input ends while decoding an element.
+   */
+  def manyComplete[A](decoder: Decoder[A]): StreamDecoder[A] =
+    new StreamDecoder[A](Decode(in => decoder.decode(in).map(_.map(emit)), once = false, failOnErr = true, failOnPrematureEos = true))
 
   /**
    * Creates a stream decoder that attempts to decode one `A` using the supplied decoder. 
@@ -181,7 +196,7 @@ object StreamDecoder {
    * If decoding fails, the bits are not consumed and the stream decoder yields no values.
    */
   def tryOnce[A](decoder: Decoder[A]): StreamDecoder[A] =
-    new StreamDecoder[A](Decode(in => decoder.decode(in).map(_.map(emit)), once = true, failOnErr = false))
+    new StreamDecoder[A](Decode(in => decoder.decode(in).map(_.map(emit)), once = true, failOnErr = false, failOnPrematureEos = false))
   
   /**
    * Creates a stream decoder that repeatedly decodes `A` values until decoding fails.
@@ -189,7 +204,7 @@ object StreamDecoder {
    * having emitted any successfully decoded values earlier.
    */
   def tryMany[A](decoder: Decoder[A]): StreamDecoder[A] =
-    new StreamDecoder[A](Decode(in => decoder.decode(in).map(_.map(emit)), once = false, failOnErr = false))
+    new StreamDecoder[A](Decode(in => decoder.decode(in).map(_.map(emit)), once = false, failOnErr = false, failOnPrematureEos = false))
 
   /** Creates a stream decoder that fails decoding with the specified exception. */
   def raiseError(cause: Throwable): StreamDecoder[Nothing] = new StreamDecoder(Failed(cause))
