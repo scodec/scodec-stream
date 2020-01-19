@@ -1,7 +1,5 @@
 package scodec.stream
 
-import language.higherKinds
-
 import fs2._
 import scodec.bits.BitVector
 import scodec.{Encoder, Err}

@@ -1,7 +1,5 @@
 package scodec.stream
 
-import language.higherKinds
-
 import fs2._
 import scodec.{ Attempt, Decoder, DecodeResult, Err }
 import scodec.bits.BitVector
