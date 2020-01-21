@@ -30,7 +30,7 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
     StreamDecoder.tryMany(int32).decode[Fallible](Stream(bits)).toList == Right(List(1, 2, 3))
   }
 
-  property("isolate") = forAll { (ints: List[Int], seed: Long) =>
+  property("isolate") = forAll { (ints: List[Int], _: Long) =>
     val bits = vector(int32).encode(ints.toVector).require
     val d =
       StreamDecoder.many(int32).isolate(bits.size).map(_ => 0) ++

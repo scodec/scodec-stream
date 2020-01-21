@@ -111,7 +111,7 @@ object StreamEncoder {
         case None => Pull.pure(None)
         case Some((a, s1)) =>
           encoder.encode(a).fold(
-            e => Pull.pure(Some(s1.cons1(a) -> empty)),
+            _ => Pull.pure(Some(s1.cons1(a) -> empty)),
             b => Pull.output1(b) >> Pull.pure(Some(s1 -> empty))
           )
       }

@@ -58,7 +58,7 @@ object Mpeg extends App {
 
   def countElements(decoder: StreamDecoder[_]): IO[Int] =
     Stream.resource(Blocker[IO]).flatMap { blocker =>
-      fs2.io.file.readAll[IO](filePath, blocker, 4096).chunks.map(c => BitVector.view(c.toArray)).through(streamThroughRecordsOnly.toPipe)
+      fs2.io.file.readAll[IO](filePath, blocker, 4096).chunks.map(c => BitVector.view(c.toArray)).through(decoder.toPipe)
     }.compile.fold(0)((acc, _) => acc + 1)
 
   val result2 = time("coarse-grained") { countElements(streamThroughRecordsOnly).unsafeRunSync }

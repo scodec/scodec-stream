@@ -61,7 +61,7 @@ final class StreamDecoder[+A](private val step: StreamDecoder.Step[A]) { self =>
                     case Some(next) => loop(BitVector.empty, next)
                     case None => Pull.pure(None)
                   }
-                case Attempt.Failure(e: Err.InsufficientBits) =>
+                case Attempt.Failure(_: Err.InsufficientBits) =>
                   loop(buffer, tl)
                 case Attempt.Failure(e) =>
                   if (failOnErr) Pull.raiseError(CodecError(e))
