@@ -13,7 +13,7 @@ lazy val settings = Seq(
   organization := "org.scodec",
   organizationHomepage := Some(new URL("http://scodec.org")),
   licenses += ("Three-clause BSD-style", url(
-    "https://github.com/scodec/scodec-bits/blob/master/LICENSE"
+    "https://github.com/scodec/scodec-stream/blob/master/LICENSE"
   )),
   git.remoteRepo := "git@github.com:scodec/scodec-stream.git",
   scmInfo := Some(
