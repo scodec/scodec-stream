@@ -9,7 +9,59 @@ lazy val contributors = Seq(
   "pchiusano" -> "Paul Chiusano"
 )
 
-lazy val settings = Seq(
+lazy val sharedScalaOptions = Seq(
+  "-deprecation",
+  "-encoding",
+  "UTF-8",
+  "-explaintypes",
+  "-Yrangepos",
+  "-feature",
+  "-language:higherKinds",
+  "-language:existentials",
+  "-unchecked",
+  "-Xlint:_,-type-parameter-shadow",
+  "-Ywarn-dead-code",
+  "-Ywarn-numeric-widen",
+  "-Ywarn-value-discard",
+  "-Xfatal-warnings"
+)
+
+lazy val scala212Options = Seq(
+  "-opt:l:inline",
+  "-opt-inline-from:<source>",
+  "-opt-warnings",
+  "-Ywarn-unused:imports",
+  "-Ywarn-unused:_,imports",
+  "-Xlint:constant",
+  "-Ywarn-extra-implicit",
+  "-Ywarn-inaccessible",
+  "-Ywarn-infer-any",
+  "-Ywarn-nullary-unit",
+  "-Ywarn-nullary-override",
+  "-Ypartial-unification",
+  "-Yno-adapted-args",
+  "-Xfuture"
+)
+
+lazy val scala213Options = Seq(
+  "-Xsource:2.13"
+)
+
+lazy val versionOf = new {
+  val fs2           = "2.2.1"
+  val scalacheck    = "1.14.1"
+  val `scodec-core` = "1.11.4"
+}
+
+lazy val dependencies = Seq(
+  "co.fs2"         %% "fs2-core"    % versionOf.fs2,
+  "org.scodec"     %% "scodec-core" % versionOf.`scodec-core`,
+  "co.fs2"         %% "fs2-io"      % versionOf.fs2        % Test,
+  "org.scalacheck" %% "scalacheck"  % versionOf.scalacheck % Test
+)
+
+lazy val moduleSettings = Seq(
+  name := "scodec-stream",
   organization := "org.scodec",
   organizationHomepage := Some(new URL("http://scodec.org")),
   licenses += ("Three-clause BSD-style", url(
@@ -19,47 +71,16 @@ lazy val settings = Seq(
   scmInfo := Some(
     ScmInfo(url("https://github.com/scodec/scodec-stream"), "git@github.com:scodec/scodec-stream.git")
   ),
-  scalacOptions ++= Seq(
-    "-deprecation",
-    "-encoding",
-    "UTF-8",
-    "-explaintypes",
-    "-Yrangepos",
-    "-feature",
-    "-language:higherKinds",
-    "-language:existentials",
-    "-unchecked",
-    "-Xlint:_,-type-parameter-shadow",
-    "-Ywarn-dead-code",
-    "-Ywarn-numeric-widen",
-    "-Ywarn-value-discard",
-    "-Xfatal-warnings"
-  ) ++
-    (scalaBinaryVersion.value match {
-      case v if v.startsWith("2.13") =>
-        List("-Xsource:2.13")
-      case v if v.startsWith("2.12") =>
-        List(
-          "-opt:l:inline",
-          "-opt-inline-from:<source>",
-          "-opt-warnings",
-          "-Ywarn-unused:imports",
-          "-Ywarn-unused:_,imports",
-          "-Xlint:constant",
-          "-Ywarn-extra-implicit",
-          "-Ywarn-inaccessible",
-          "-Ywarn-infer-any",
-          "-Ywarn-nullary-unit",
-          "-Ywarn-nullary-override",
-          "-Ypartial-unification",
-          "-Yno-adapted-args",
-          "-Xfuture"
-        )
-      case other => sys.error(s"Unsupported scala version: $other")
+  scalacOptions ++= sharedScalaOptions ++
+    (CrossVersion.partialVersion(scalaVersion.value) match {
+      case Some((2, 12))  => scala212Options
+      case Some((2, 13))  => scala213Options
+      case Some((ma, mi)) => sys.error(s"Unsupported scala version: $ma.$mi")
+      case None           => sys.error(s"Not found any scala version set")
     }),
   testOptions in Test += Tests.Argument(TestFrameworks.ScalaTest, "-oD"),
   releaseCrossBuild := true
-) ++ publishingSettings
+)
 
 lazy val publishingSettings = Seq(
   publishTo := {
@@ -71,20 +92,17 @@ lazy val publishingSettings = Seq(
   },
   publishMavenStyle := true,
   publishArtifact in Test := false,
-  pomIncludeRepository := { x =>
-    false
-  },
-  pomExtra := (
+  pomIncludeRepository := { _ => false },
+  pomExtra :=
     <url>http://github.com/scodec/scodec-stream</url>
-      <developers>
-        {for ((username, name) <- contributors) yield <developer>
-        <id>{username}</id>
-        <name>{name}</name>
-        <url>http://github.com/{username}</url>
-      </developer>}
-      </developers>
-    ),
-  pomPostProcess := { (node) =>
+    <developers>
+      {for ((username, name) <- contributors) yield <developer>
+      <id>{username}</id>
+      <name>{name}</name>
+      <url>http://github.com/{username}</url>
+    </developer>}
+    </developers>,
+  pomPostProcess := { node =>
     import scala.xml._
     import scala.xml.transform._
     def stripIf(f: Node => Boolean) = new RewriteRule {
@@ -98,24 +116,45 @@ lazy val publishingSettings = Seq(
   }
 )
 
+lazy val osgiSettings = Seq(
+  OsgiKeys.privatePackage := Nil,
+  OsgiKeys.exportPackage := Seq("scodec.stream.*;version=${Bundle-Version}"),
+  OsgiKeys.importPackage := Seq(
+    """scala.*;version="$<range;[==,=+);$<@>>"""",
+    """fs2.*;version="$<range;[==,=+);$<@>>"""",
+    """scodec.*;version="$<range;[==,=+);$<@>>"""",
+    "*"
+  ),
+  OsgiKeys.additionalHeaders := Map("-removeheaders" -> "Include-Resource,Private-Package")
+)
+
+lazy val buildInfoSettings = Seq(
+  buildInfoPackage := "scodec.stream",
+  buildInfoKeys := Seq[BuildInfoKey](version, scalaVersion, gitHeadCommit)
+)
+
+lazy val mimaSettings = Seq(
+  mimaPreviousArtifacts := {
+    List().map { pv =>
+      organization.value % (normalizedName.value + "_" + scalaBinaryVersion.value) % pv
+    }.toSet
+  }
+)
+
 val scodecStream = project.in(file("."))
   .enablePlugins(BuildInfoPlugin)
-  .settings(settings: _*)
+  .settings(moduleSettings)
+  .settings(mimaSettings)
+  .settings(osgiSettings)
+  .settings(buildInfoSettings)
+  .settings(publishingSettings)
   .settings(
-    name := "scodec-stream",
-    libraryDependencies ++= Seq(
-      "org.scodec" %% "scodec-core" % "1.11.4",
-      "co.fs2" %% "fs2-core" % "2.2.0",
-      "co.fs2" %% "fs2-io" % "2.2.0" % "test",
-      "org.scalacheck" %% "scalacheck" % "1.14.1" % "test"
-    ),
+    libraryDependencies ++= dependencies,
     autoAPIMappings := true,
-    buildInfoPackage := "scodec.stream",
-    buildInfoKeys := Seq[BuildInfoKey](version, scalaVersion, gitHeadCommit),
     scalacOptions in (Compile, doc) := {
       val tagOrBranch = {
         if (version.value.endsWith("SNAPSHOT")) gitCurrentBranch.value
-        else ("v" + version.value)
+        else "v" + version.value
       }
       Seq(
         "-groups",
@@ -132,19 +171,5 @@ val scodecStream = project.in(file("."))
         o == "-Ywarn-unused" || o == "-Xfatal-warnings"
       }
     },
-    scalacOptions in (Test, console) := (scalacOptions in (Compile, console)).value,
-    mimaPreviousArtifacts := {
-      List().map { pv =>
-        organization.value % (normalizedName.value + "_" + scalaBinaryVersion.value) % pv
-      }.toSet
-    },
-    OsgiKeys.privatePackage := Nil,
-    OsgiKeys.exportPackage := Seq("scodec.stream.*;version=${Bundle-Version}"),
-    OsgiKeys.importPackage := Seq(
-      """scala.*;version="$<range;[==,=+);$<@>>"""",
-      """fs2.*;version="$<range;[==,=+);$<@>>"""",
-      """scodec.*;version="$<range;[==,=+);$<@>>"""",
-      "*"
-    ),
-    OsgiKeys.additionalHeaders := Map("-removeheaders" -> "Include-Resource,Private-Package")
+    scalacOptions in (Test, console) := (scalacOptions in (Compile, console)).value
   )
