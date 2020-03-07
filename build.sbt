@@ -50,7 +50,7 @@ lazy val scala213Options = Seq(
 lazy val versionOf = new {
   val fs2           = "2.2.1"
   val scalacheck    = "1.14.1"
-  val `scodec-core` = "1.11.4"
+  val `scodec-core` = "1.11.6"
 }
 
 lazy val dependencies = Seq(
