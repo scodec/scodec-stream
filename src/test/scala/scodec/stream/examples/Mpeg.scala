@@ -25,7 +25,7 @@ object Mpeg extends App {
     val mpegPcapDecoder: StreamDecoder[MpegPacket] = pcapRecordStreamDecoder.flatMap { record =>
       // Drop 22 byte ethernet frame header and 20 byte IPv4/udp header
       val datagramPayloadBits = record.data.drop(22 * 8).drop(20 * 8)
-      val packets = codecs.vector(Codec[MpegPacket]).decode(datagramPayloadBits).map { _.value }
+      val packets = codecs.vector(Codec.summon[MpegPacket]).decode(datagramPayloadBits).map { _.value }
       packets.fold(e => StreamDecoder.raiseError(CodecError(e)), StreamDecoder.emits(_))
     }
 
@@ -58,7 +58,7 @@ object Mpeg extends App {
 
   def countElements(decoder: StreamDecoder[_]): IO[Int] =
     Stream.resource(Blocker[IO]).flatMap { blocker =>
-      fs2.io.file.readAll[IO](filePath, blocker, 4096).chunks.map(c => BitVector.view(c.toArray)).through(streamThroughRecordsOnly.toPipe)
+      fs2.io.file.readAll[IO](filePath, blocker, 4096).chunks.map(c => BitVector.view(c.toArray)).through(decoder.toPipe)
     }.compile.fold(0)((acc, _) => acc + 1)
 
   val result2 = time("coarse-grained") { countElements(streamThroughRecordsOnly).unsafeRunSync }
