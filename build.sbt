@@ -62,6 +62,7 @@ lazy val moduleSettings = Seq(
       "git@github.com:scodec/scodec-stream.git"
     )
   ),
+  crossScalaVersions := List("2.12.10", "2.13.1"),
   scalacOptions ++= sharedScalaOptions ++
     (CrossVersion.partialVersion(scalaVersion.value) match {
       case Some((2, 12))  => scala212Options
