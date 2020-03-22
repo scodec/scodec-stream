@@ -18,7 +18,8 @@ object SpaceLeakTest extends Properties("space-leak") {
     val chunk = (0 until M).toVector
     val dec = StreamDecoder.many(ints)
     val source = Stream(ints.encode(chunk).require).repeat
-    val actual = source.through(dec.toPipe[Fallible]).take(N).flatMap(Stream.emits(_)).compile.foldMonoid
+    val actual =
+      source.through(dec.toPipe[Fallible]).take(N).flatMap(Stream.emits(_)).compile.foldMonoid
     actual == Right((0 until M).sum * N)
   }
 }

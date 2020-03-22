@@ -1,4 +1,5 @@
 import com.typesafe.tools.mima.core._
+import sbtcrossproject.CrossPlugin.autoImport.{CrossType, crossProject}
 import com.typesafe.sbt.SbtGit.GitKeys.{gitCurrentBranch, gitHeadCommit}
 
 addCommandAlias("fmt", "; compile:scalafmt; test:scalafmt; scalafmtSbt")
@@ -47,13 +48,6 @@ lazy val scala213Options = Seq(
   "-Xsource:2.13"
 )
 
-lazy val dependencies = Seq(
-  "co.fs2"         %% "fs2-core"    % "2.3.0",
-  "org.scodec"     %% "scodec-core" % "1.11.7",
-  "co.fs2"         %% "fs2-io"      % "2.3.0" % Test,
-  "org.scalacheck" %% "scalacheck"  % "1.14.3" % Test
-)
-
 lazy val moduleSettings = Seq(
   name := "scodec-stream",
   organization := "org.scodec",
@@ -63,7 +57,10 @@ lazy val moduleSettings = Seq(
   )),
   git.remoteRepo := "git@github.com:scodec/scodec-stream.git",
   scmInfo := Some(
-    ScmInfo(url("https://github.com/scodec/scodec-stream"), "git@github.com:scodec/scodec-stream.git")
+    ScmInfo(
+      url("https://github.com/scodec/scodec-stream"),
+      "git@github.com:scodec/scodec-stream.git"
+    )
   ),
   scalacOptions ++= sharedScalaOptions ++
     (CrossVersion.partialVersion(scalaVersion.value) match {
@@ -86,7 +83,9 @@ lazy val publishingSettings = Seq(
   },
   publishMavenStyle := true,
   publishArtifact in Test := false,
-  pomIncludeRepository := { _ => false },
+  pomIncludeRepository := { _ =>
+    false
+  },
   pomExtra :=
     <url>http://github.com/scodec/scodec-stream</url>
     <developers>
@@ -135,7 +134,8 @@ lazy val mimaSettings = Seq(
   }
 )
 
-val scodecStream = project.in(file("."))
+val stream = crossProject(JVMPlatform, JSPlatform)
+  .in(file("."))
   .enablePlugins(BuildInfoPlugin)
   .settings(moduleSettings)
   .settings(mimaSettings)
@@ -143,7 +143,11 @@ val scodecStream = project.in(file("."))
   .settings(buildInfoSettings)
   .settings(publishingSettings)
   .settings(
-    libraryDependencies ++= dependencies,
+    libraryDependencies ++= Seq(
+      "co.fs2" %%% "fs2-core" % "2.3.0",
+      "org.scodec" %%% "scodec-core" % "1.11.7",
+      "org.scalacheck" %%% "scalacheck" % "1.14.3" % Test
+    ),
     autoAPIMappings := true,
     scalacOptions in (Compile, doc) := {
       val tagOrBranch = {
@@ -166,4 +170,18 @@ val scodecStream = project.in(file("."))
       }
     },
     scalacOptions in (Test, console) := (scalacOptions in (Compile, console)).value
+  )
+  .jvmSettings(
+    libraryDependencies ++= Seq(
+      "co.fs2" %%% "fs2-io" % "2.3.0" % Test
+    )
+  )
+lazy val streamJVM = stream.jvm
+lazy val streamJS = stream.js
+
+lazy val root = project
+  .in(file("."))
+  .aggregate(streamJVM, streamJS)
+  .settings(
+    publishArtifact := false
   )
