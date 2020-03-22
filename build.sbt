@@ -129,7 +129,7 @@ lazy val buildInfoSettings = Seq(
 
 lazy val mimaSettings = Seq(
   mimaPreviousArtifacts := {
-    List().map { pv =>
+    List("2.0.0").map { pv =>
       organization.value % (normalizedName.value + "_" + scalaBinaryVersion.value) % pv
     }.toSet
   }
@@ -184,5 +184,6 @@ lazy val root = project
   .in(file("."))
   .aggregate(streamJVM, streamJS)
   .settings(
-    publishArtifact := false
+    publishArtifact := false,
+    mimaPreviousArtifacts := Set.empty
   )
