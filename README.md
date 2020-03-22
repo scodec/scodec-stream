@@ -20,7 +20,7 @@ val s: Stream[IO, ByteVector] =
 
 When consumed, `s` will incrementally read chunks from `"largefile.bin"`, then decode a stream of frames, where each frame is expected to begin with a number of bytes specified as a 32-bit signed int (the `int32` codec), followed by a frame payload of that many bytes. Nothing happens until the `s` stream is consumed, and `s` will ensure the file is closed in the event of an error or normal termination of the consumer.
 
-See the [MPEG PCAP decoding example](https://github.com/scodec/scodec-stream/blob/series/1.1.x/src/test/scala/scodec/stream/examples/Mpeg.scala) for a more sophisticated use case.
+See the [MPEG PCAP decoding example](https://github.com/scodec/scodec-stream/blob/master/jvm/src/test/scala/scodec/stream/examples/Mpeg.scala) for a more sophisticated use case.
 
 __Links:__
 
