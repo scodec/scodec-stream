@@ -47,17 +47,11 @@ lazy val scala213Options = Seq(
   "-Xsource:2.13"
 )
 
-lazy val versionOf = new {
-  val fs2           = "2.2.1"
-  val scalacheck    = "1.14.1"
-  val `scodec-core` = "1.11.6"
-}
-
 lazy val dependencies = Seq(
-  "co.fs2"         %% "fs2-core"    % versionOf.fs2,
-  "org.scodec"     %% "scodec-core" % versionOf.`scodec-core`,
-  "co.fs2"         %% "fs2-io"      % versionOf.fs2        % Test,
-  "org.scalacheck" %% "scalacheck"  % versionOf.scalacheck % Test
+  "co.fs2"         %% "fs2-core"    % "2.3.0",
+  "org.scodec"     %% "scodec-core" % "1.11.7",
+  "co.fs2"         %% "fs2-io"      % "2.3.0" % Test,
+  "org.scalacheck" %% "scalacheck"  % "1.14.3" % Test
 )
 
 lazy val moduleSettings = Seq(
