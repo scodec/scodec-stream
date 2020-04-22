@@ -8,13 +8,16 @@ import scodec.codecs._
 import scodec.stream._
 import scodec.bits._
 import cats.effect.{Blocker, IO}
+import fs2.Stream
 
 val frames: StreamDecoder[ByteVector] = StreamDecoder.many(int32)
  .flatMap { numBytes => StreamDecoder.once(bytes(numBytes)) }
 
+val filePath = java.nio.file.Paths.get("path/to/file")
+
 val s: Stream[IO, ByteVector] =
   Stream.resource(Blocker[IO]).flatMap { blocker =>
-    fs2.io.file.readAll[IO](filePath, blocker, 4096).through(streamThroughRecordsOnly.toPipeByte)
+    fs2.io.file.readAll[IO](filePath, blocker, 4096).through(frames.toPipeByte)
   }
 ```
 
