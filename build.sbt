@@ -145,7 +145,7 @@ val stream = crossProject(JVMPlatform, JSPlatform)
   .settings(publishingSettings)
   .settings(
     libraryDependencies ++= Seq(
-      "co.fs2" %%% "fs2-core" % "2.3.0",
+      "co.fs2" %%% "fs2-core" % "2.4.1",
       "org.scodec" %%% "scodec-core" % "1.11.7",
       "org.scalacheck" %%% "scalacheck" % "1.14.3" % Test
     ),
@@ -174,7 +174,7 @@ val stream = crossProject(JVMPlatform, JSPlatform)
   )
   .jvmSettings(
     libraryDependencies ++= Seq(
-      "co.fs2" %%% "fs2-io" % "2.3.0" % Test
+      "co.fs2" %%% "fs2-io" % "2.4.1" % Test
     )
   )
 lazy val streamJVM = stream.jvm
