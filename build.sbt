@@ -28,9 +28,6 @@ lazy val sharedScalaOptions = Seq(
 )
 
 lazy val scala212Options = Seq(
-  "-opt:l:inline",
-  "-opt-inline-from:<source>",
-  "-opt-warnings",
   "-Ywarn-unused:imports",
   "-Ywarn-unused:_,imports",
   "-Xlint:constant",
