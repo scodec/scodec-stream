@@ -71,6 +71,8 @@ final class StreamDecoder[+A](private val step: StreamDecoder.Step[A]) { self =>
                     }
                 case Attempt.Failure(_: Err.InsufficientBits) =>
                   loop(buffer, tl)
+                case Attempt.Failure(comp: Err.Composite) if comp.errs.exists(_.isInstanceOf[Err.InsufficientBits]) =>
+                  loop(buffer, tl)
                 case Attempt.Failure(e) =>
                   if (failOnErr) Pull.raiseError(CodecError(e))
                   else Pull.pure(Some(Stream(buffer)))
