@@ -9,14 +9,12 @@ import scodec.codecs._
 
 object ScodecStreamSpec extends Properties("scodec.stream") {
 
-  property("many/tryMany") = {
-    forAll { (ints: List[Int]) =>
-      val bits = vector(int32).encode(Vector.empty[Int] ++ ints).require
-      val bits2 = StreamEncoder.many(int32).encodeAllValid(ints)
-      bits == bits2 &&
-      StreamDecoder.many(int32).decode[Fallible](Stream(bits)).toList == Right(ints) &&
-      StreamDecoder.tryMany(int32).decode[Fallible](Stream(bits2)).toList == Right(ints)
-    }
+  property("many/tryMany") = forAll { (ints: List[Int]) =>
+    val bits = vector(int32).encode(Vector.empty[Int] ++ ints).require
+    val bits2 = StreamEncoder.many(int32).encodeAllValid(ints)
+    bits == bits2 &&
+    StreamDecoder.many(int32).decode[Fallible](Stream(bits)).toList == Right(ints) &&
+    StreamDecoder.tryMany(int32).decode[Fallible](Stream(bits2)).toList == Right(ints)
   }
 
   property("many/tryMany-insufficient") = secure {
