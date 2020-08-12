@@ -71,7 +71,8 @@ final class StreamDecoder[+A](private val step: StreamDecoder.Step[A]) { self =>
                     }
                 case Attempt.Failure(_: Err.InsufficientBits) =>
                   loop(buffer, tl)
-                case Attempt.Failure(comp: Err.Composite) if comp.errs.exists(_.isInstanceOf[Err.InsufficientBits]) =>
+                case Attempt.Failure(comp: Err.Composite)
+                    if comp.errs.exists(_.isInstanceOf[Err.InsufficientBits]) =>
                   loop(buffer, tl)
                 case Attempt.Failure(e) =>
                   if (failOnErr) Pull.raiseError(CodecError(e))
@@ -102,17 +103,18 @@ final class StreamDecoder[+A](private val step: StreamDecoder.Step[A]) { self =>
     * the next part of the input with the returned decoder. When that decoder finishes, the remainder of
     * the input is returned to the original decoder for further decoding.
     */
-  def flatMap[B](f: A => StreamDecoder[B]): StreamDecoder[B] = new StreamDecoder[B](
-    self.step match {
-      case Empty         => Empty
-      case Result(a)     => f(a).step
-      case Failed(cause) => Failed(cause)
-      case Decode(g, once, failOnErr) =>
-        Decode(in => g(in).map(_.map(_.flatMap(f))), once, failOnErr)
-      case Isolate(bits, decoder) => Isolate(bits, decoder.flatMap(f))
-      case Append(x, y)           => Append(x.flatMap(f), () => y().flatMap(f))
-    }
-  )
+  def flatMap[B](f: A => StreamDecoder[B]): StreamDecoder[B] =
+    new StreamDecoder[B](
+      self.step match {
+        case Empty         => Empty
+        case Result(a)     => f(a).step
+        case Failed(cause) => Failed(cause)
+        case Decode(g, once, failOnErr) =>
+          Decode(in => g(in).map(_.map(_.flatMap(f))), once, failOnErr)
+        case Isolate(bits, decoder) => Isolate(bits, decoder.flatMap(f))
+        case Append(x, y)           => Append(x.flatMap(f), () => y().flatMap(f))
+      }
+    )
 
   /** Maps the supplied function over each output of this decoder. */
   def map[B](f: A => B): StreamDecoder[B] = flatMap(a => StreamDecoder.emit(f(a)))
@@ -132,36 +134,38 @@ final class StreamDecoder[+A](private val step: StreamDecoder.Step[A]) { self =>
   def isolate(bits: Long): StreamDecoder[A] = StreamDecoder.isolate(bits)(this)
 
   /** Converts this stream decoder to a `Decoder[Vector[A]]`. */
-  def strict: Decoder[Vector[A]] = new Decoder[Vector[A]] {
-    def decode(bits: BitVector): Attempt[DecodeResult[Vector[A]]] = {
-      type ET[X] = Either[Throwable, X]
-      self
-        .map(Left(_))
-        .apply[Fallible](Stream(bits))
-        .flatMap { remainder =>
-          remainder
-            .map { r =>
-              r.map(Right(_)).pull.echo
-            }
-            .getOrElse(Pull.done)
-        }
-        .stream
-        .compile[Fallible, ET, Either[A, BitVector]]
-        .fold((Vector.empty[A], BitVector.empty)) {
-          case ((acc, rem), entry) =>
-            entry match {
-              case Left(a)   => (acc :+ a, rem)
-              case Right(r2) => (acc, rem ++ r2)
-            }
-        }
-        .fold(
-          {
-            case CodecError(e) => Attempt.failure(e)
-            case other         => Attempt.failure(Err.General(other.getMessage, Nil))
-          }, { case (acc, rem) => Attempt.successful(DecodeResult(acc, rem)) }
-        )
+  def strict: Decoder[Vector[A]] =
+    new Decoder[Vector[A]] {
+      def decode(bits: BitVector): Attempt[DecodeResult[Vector[A]]] = {
+        type ET[X] = Either[Throwable, X]
+        self
+          .map(Left(_))
+          .apply[Fallible](Stream(bits))
+          .flatMap { remainder =>
+            remainder
+              .map { r =>
+                r.map(Right(_)).pull.echo
+              }
+              .getOrElse(Pull.done)
+          }
+          .stream
+          .compile[Fallible, ET, Either[A, BitVector]]
+          .fold((Vector.empty[A], BitVector.empty)) {
+            case ((acc, rem), entry) =>
+              entry match {
+                case Left(a)   => (acc :+ a, rem)
+                case Right(r2) => (acc, rem ++ r2)
+              }
+          }
+          .fold(
+            {
+              case CodecError(e) => Attempt.failure(e)
+              case other         => Attempt.failure(Err.General(other.getMessage, Nil))
+            },
+            { case (acc, rem) => Attempt.successful(DecodeResult(acc, rem)) }
+          )
+      }
     }
-  }
 }
 
 object StreamDecoder {
