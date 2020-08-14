@@ -88,7 +88,8 @@ lazy val publishingSettings = Seq(
     <url>http://github.com/scodec/scodec-stream</url>
     <developers>
       {
-      for ((username, name) <- contributors) yield <developer>
+      for ((username, name) <- contributors)
+        yield <developer>
       <id>{username}</id>
       <name>{name}</name>
       <url>http://github.com/{username}</url>
