@@ -47,43 +47,46 @@ final class StreamEncoder[A](private val step: StreamEncoder.Step[A]) { self =>
     loop(in, this)
   }
 
-  private def or(other: StreamEncoder[A]): StreamEncoder[A] = new StreamEncoder[A](
-    new StreamEncoder.Step[A] {
-      def apply[F[_]: RaiseThrowable](
-          s: Stream[F, A]
-      ): Pull[F, BitVector, Option[(Stream[F, A], StreamEncoder[A])]] =
-        self.step(s).flatMap {
-          case Some(x) => Pull.pure(Some(x))
-          case None    => other.step(s)
-        }
-    }
-  )
+  private def or(other: StreamEncoder[A]): StreamEncoder[A] =
+    new StreamEncoder[A](
+      new StreamEncoder.Step[A] {
+        def apply[F[_]: RaiseThrowable](
+            s: Stream[F, A]
+        ): Pull[F, BitVector, Option[(Stream[F, A], StreamEncoder[A])]] =
+          self.step(s).flatMap {
+            case Some(x) => Pull.pure(Some(x))
+            case None    => other.step(s)
+          }
+      }
+    )
 
   /**
     * Creates a stream encoder that first encodes with this encoder and then when complete,
     * encodes the remainder with the supplied encoder.
     */
-  def ++(that: => StreamEncoder[A]): StreamEncoder[A] = new StreamEncoder[A](
-    new StreamEncoder.Step[A] {
-      def apply[F[_]: RaiseThrowable](
-          s: Stream[F, A]
-      ): Pull[F, BitVector, Option[(Stream[F, A], StreamEncoder[A])]] =
-        self.step(s).map { _.map { case (s1, next) => (s1, next.or(that)) } }
-    }
-  )
+  def ++(that: => StreamEncoder[A]): StreamEncoder[A] =
+    new StreamEncoder[A](
+      new StreamEncoder.Step[A] {
+        def apply[F[_]: RaiseThrowable](
+            s: Stream[F, A]
+        ): Pull[F, BitVector, Option[(Stream[F, A], StreamEncoder[A])]] =
+          self.step(s).map(_.map { case (s1, next) => (s1, next.or(that)) })
+      }
+    )
 
   /** Encodes values as long as there are more inputs. */
   def repeat: StreamEncoder[A] = this ++ repeat
 
   /** Transform the input type of this `StreamEncoder`. */
-  def xmapc[B](f: A => B)(g: B => A): StreamEncoder[B] = new StreamEncoder[B](
-    new StreamEncoder.Step[B] {
-      def apply[F[_]: RaiseThrowable](
-          s: Stream[F, B]
-      ): Pull[F, BitVector, Option[(Stream[F, B], StreamEncoder[B])]] =
-        self.step(s.map(g)).map { _.map { case (s1, e1) => s1.map(f) -> e1.xmapc(f)(g) } }
-    }
-  )
+  def xmapc[B](f: A => B)(g: B => A): StreamEncoder[B] =
+    new StreamEncoder[B](
+      new StreamEncoder.Step[B] {
+        def apply[F[_]: RaiseThrowable](
+            s: Stream[F, B]
+        ): Pull[F, BitVector, Option[(Stream[F, B], StreamEncoder[B])]] =
+          self.step(s.map(g)).map(_.map { case (s1, e1) => s1.map(f) -> e1.xmapc(f)(g) })
+      }
+    )
 }
 
 object StreamEncoder {

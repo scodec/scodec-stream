@@ -25,7 +25,7 @@ object Mpeg extends App {
     val mpegPcapDecoder: StreamDecoder[MpegPacket] = pcapRecordStreamDecoder.flatMap { record =>
       // Drop 22 byte ethernet frame header and 20 byte IPv4/udp header
       val datagramPayloadBits = record.data.drop(22 * 8).drop(20 * 8)
-      val packets = codecs.vector(Codec[MpegPacket]).decode(datagramPayloadBits).map { _.value }
+      val packets = codecs.vector(Codec[MpegPacket]).decode(datagramPayloadBits).map(_.value)
       packets.fold(e => StreamDecoder.raiseError(CodecError(e)), StreamDecoder.emits(_))
     }
 
@@ -70,8 +70,8 @@ object Mpeg extends App {
       .compile
       .fold(0)((acc, _) => acc + 1)
 
-  val result2 = time("coarse-grained") { countElements(streamThroughRecordsOnly).unsafeRunSync }
-  val result1 = time("fine-grained") { countElements(streamier).unsafeRunSync }
+  val result2 = time("coarse-grained")(countElements(streamThroughRecordsOnly).unsafeRunSync)
+  val result1 = time("fine-grained")(countElements(streamier).unsafeRunSync)
 
   println("fine-grained stream packet count: " + result1)
   println("coarse-grained stream packet count: " + result2)
@@ -89,7 +89,7 @@ object PcapCodec {
   case object BigEndian extends ByteOrdering
   case object LittleEndian extends ByteOrdering
 
-  private val magicNumber = 0x000000A1B2C3D4L
+  private val magicNumber = 0x000000a1b2c3d4L
   val byteOrdering = "magic_number" | Codec[ByteOrdering](
     (bo: ByteOrdering) =>
       if (bo == BigEndian) uint32.encode(magicNumber) else uint32L.encode(magicNumber),
