@@ -87,19 +87,22 @@ lazy val publishingSettings = Seq(
   pomExtra :=
     <url>http://github.com/scodec/scodec-stream</url>
     <developers>
-      {for ((username, name) <- contributors) yield <developer>
+      {
+      for ((username, name) <- contributors) yield <developer>
       <id>{username}</id>
       <name>{name}</name>
       <url>http://github.com/{username}</url>
-    </developer>}
+    </developer>
+    }
     </developers>,
   pomPostProcess := { node =>
     import scala.xml._
     import scala.xml.transform._
-    def stripIf(f: Node => Boolean) = new RewriteRule {
-      override def transform(n: Node) =
-        if (f(n)) NodeSeq.Empty else n
-    }
+    def stripIf(f: Node => Boolean) =
+      new RewriteRule {
+        override def transform(n: Node) =
+          if (f(n)) NodeSeq.Empty else n
+      }
     val stripTestScope = stripIf { n =>
       n.label == "dependency" && (n \ "scope").text == "test"
     }
