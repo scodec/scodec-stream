@@ -148,7 +148,7 @@ val stream = crossProject(JVMPlatform, JSPlatform)
     libraryDependencies ++= Seq(
       "co.fs2" %%% "fs2-core" % "2.4.2",
       "org.scodec" %%% "scodec-core" % "1.11.7",
-      "org.scalacheck" %%% "scalacheck" % "1.14.3" % Test
+      "org.scalacheck" %%% "scalacheck" % "1.15.1" % Test
     ),
     autoAPIMappings := true,
     scalacOptions in (Compile, doc) := {
