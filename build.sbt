@@ -5,186 +5,107 @@ import com.typesafe.sbt.SbtGit.GitKeys.{gitCurrentBranch, gitHeadCommit}
 addCommandAlias("fmt", "; compile:scalafmt; test:scalafmt; scalafmtSbt")
 addCommandAlias("fmtCheck", "; compile:scalafmtCheck; test:scalafmtCheck; scalafmtSbtCheck")
 
-lazy val contributors = Seq(
-  "mpilquist" -> "Michael Pilquist",
+ThisBuild / baseVersion := "2.0"
+
+ThisBuild / organization := "org.scodec"
+ThisBuild / organizationName := "Scodec"
+
+ThisBuild / homepage := Some(url("https://github.com/scodec/scodec-stream"))
+ThisBuild / startYear := Some(2013)
+
+ThisBuild / crossScalaVersions := Seq("2.12.11", "2.13.3")
+
+ThisBuild / strictSemVer := false
+
+ThisBuild / versionIntroduced := Map(
+  "3.0.0-M1" -> "2.0.99"
+)
+
+ThisBuild / githubWorkflowJavaVersions := Seq("adopt@1.8")
+
+ThisBuild / githubWorkflowPublishTargetBranches := Seq(
+  RefPredicate.Equals(Ref.Branch("main")),
+  RefPredicate.StartsWith(Ref.Tag("v"))
+)
+
+ThisBuild / githubWorkflowEnv ++= Map(
+  "SONATYPE_USERNAME" -> s"$${{ secrets.SONATYPE_USERNAME }}",
+  "SONATYPE_PASSWORD" -> s"$${{ secrets.SONATYPE_PASSWORD }}",
+  "PGP_SECRET" -> s"$${{ secrets.PGP_SECRET }}"
+)
+
+ThisBuild / githubWorkflowTargetTags += "v*"
+
+ThisBuild / githubWorkflowPublishPreamble +=
+  WorkflowStep.Run(
+    List("echo $PGP_SECRET | base64 -d | gpg --import"),
+    name = Some("Import signing key")
+  )
+
+ThisBuild / githubWorkflowPublish := Seq(WorkflowStep.Sbt(List("release")))
+
+ThisBuild / scmInfo := Some(
+  ScmInfo(url("https://github.com/scodec/scodec-stream"), "git@github.com:scodec/scodec-stream.git")
+)
+
+ThisBuild / licenses := List(
+  ("BSD-3-Clause", url("https://github.com/scodec/scodec-stream/blob/main/LICENSE"))
+)
+
+ThisBuild / testFrameworks += new TestFramework("munit.Framework")
+
+ThisBuild / publishGithubUser := "mpilquist"
+ThisBuild / publishFullName := "Michael Pilquist"
+ThisBuild / developers ++= List(
   "pchiusano" -> "Paul Chiusano"
-)
+).map {
+  case (username, fullName) =>
+    Developer(username, fullName, s"@$username", url(s"https://github.com/$username"))
+}
 
-lazy val sharedScalaOptions = Seq(
-  "-deprecation",
-  "-encoding",
-  "UTF-8",
-  "-explaintypes",
-  "-Yrangepos",
-  "-feature",
-  "-language:higherKinds",
-  "-language:existentials",
-  "-unchecked",
-  "-Xlint:_,-type-parameter-shadow",
-  "-Ywarn-dead-code",
-  "-Ywarn-numeric-widen",
-  "-Ywarn-value-discard",
-  "-Xfatal-warnings"
-)
+ThisBuild / fatalWarningsInCI := false
 
-lazy val scala212Options = Seq(
-  "-Ywarn-unused:imports",
-  "-Ywarn-unused:_,imports",
-  "-Xlint:constant",
-  "-Ywarn-extra-implicit",
-  "-Ywarn-inaccessible",
-  "-Ywarn-infer-any",
-  "-Ywarn-nullary-unit",
-  "-Ywarn-nullary-override",
-  "-Ypartial-unification",
-  "-Yno-adapted-args",
-  "-Xfuture"
-)
-
-lazy val scala213Options = Seq(
-  "-Xsource:2.13"
-)
-
-lazy val moduleSettings = Seq(
-  name := "scodec-stream",
-  organization := "org.scodec",
-  organizationHomepage := Some(new URL("http://scodec.org")),
-  licenses += ("Three-clause BSD-style", url(
-    "https://github.com/scodec/scodec-stream/blob/master/LICENSE"
-  )),
-  git.remoteRepo := "git@github.com:scodec/scodec-stream.git",
-  scmInfo := Some(
-    ScmInfo(
-      url("https://github.com/scodec/scodec-stream"),
-      "git@github.com:scodec/scodec-stream.git"
-    )
-  ),
-  crossScalaVersions := List("2.12.10", "2.13.1"),
-  scalacOptions ++= sharedScalaOptions ++
-    (CrossVersion.partialVersion(scalaVersion.value) match {
-      case Some((2, 12))  => scala212Options
-      case Some((2, 13))  => scala213Options
-      case Some((ma, mi)) => sys.error(s"Unsupported scala version: $ma.$mi")
-      case None           => sys.error(s"Not found any scala version set")
-    }),
-  testOptions in Test += Tests.Argument(TestFrameworks.ScalaTest, "-oD"),
-  releaseCrossBuild := true
-)
-
-lazy val publishingSettings = Seq(
-  publishTo := {
-    val nexus = "https://oss.sonatype.org/"
-    if (version.value.trim.endsWith("SNAPSHOT"))
-      Some("snapshots".at(nexus + "content/repositories/snapshots"))
-    else
-      Some("releases".at(nexus + "service/local/staging/deploy/maven2"))
-  },
-  publishMavenStyle := true,
-  publishArtifact in Test := false,
-  pomIncludeRepository := { _ =>
-    false
-  },
-  pomExtra :=
-    <url>http://github.com/scodec/scodec-stream</url>
-    <developers>
-      {
-      for ((username, name) <- contributors)
-        yield <developer>
-      <id>{username}</id>
-      <name>{name}</name>
-      <url>http://github.com/{username}</url>
-    </developer>
-    }
-    </developers>,
-  pomPostProcess := { node =>
-    import scala.xml._
-    import scala.xml.transform._
-    def stripIf(f: Node => Boolean) =
-      new RewriteRule {
-        override def transform(n: Node) =
-          if (f(n)) NodeSeq.Empty else n
-      }
-    val stripTestScope = stripIf { n =>
-      n.label == "dependency" && (n \ "scope").text == "test"
-    }
-    new RuleTransformer(stripTestScope).transform(node)(0)
-  }
-)
-
-lazy val osgiSettings = Seq(
-  OsgiKeys.privatePackage := Nil,
-  OsgiKeys.exportPackage := Seq("scodec.stream.*;version=${Bundle-Version}"),
-  OsgiKeys.importPackage := Seq(
-    """scala.*;version="$<range;[==,=+);$<@>>"""",
-    """fs2.*;version="$<range;[==,=+);$<@>>"""",
-    """scodec.*;version="$<range;[==,=+);$<@>>"""",
-    "*"
-  ),
-  OsgiKeys.additionalHeaders := Map("-removeheaders" -> "Include-Resource,Private-Package")
-)
-
-lazy val buildInfoSettings = Seq(
-  buildInfoPackage := "scodec.stream",
-  buildInfoKeys := Seq[BuildInfoKey](version, scalaVersion, gitHeadCommit)
-)
-
-lazy val mimaSettings = Seq(
-  mimaPreviousArtifacts := {
-    List("2.0.0").map { pv =>
-      organization.value % (normalizedName.value + "_" + scalaBinaryVersion.value) % pv
-    }.toSet
-  }
+ThisBuild / mimaBinaryIssueFilters ++= Seq(
 )
 
 val stream = crossProject(JVMPlatform, JSPlatform)
   .in(file("."))
   .enablePlugins(BuildInfoPlugin)
-  .settings(moduleSettings)
-  .settings(mimaSettings)
-  .settings(osgiSettings)
-  .settings(buildInfoSettings)
-  .settings(publishingSettings)
   .settings(
+    name := "scodec-stream",
+    buildInfoPackage := "scodec.stream",
+    buildInfoKeys := Seq[BuildInfoKey](version, scalaVersion, gitHeadCommit),
     libraryDependencies ++= Seq(
-      "co.fs2" %%% "fs2-core" % "2.4.2",
-      "org.scodec" %%% "scodec-core" % "1.11.7",
-      "org.scalacheck" %%% "scalacheck" % "1.14.3" % Test
+      "co.fs2" %%% "fs2-core" % "2.5.0-M1",
+      "org.scodec" %%% "scodec-core" % (if (isDotty.value) "2.0.0-M1" else "1.11.7"),
+      "org.scalacheck" %%% "scalacheck" % "1.15.1" % Test
     ),
-    autoAPIMappings := true,
-    scalacOptions in (Compile, doc) := {
-      val tagOrBranch = {
-        if (version.value.endsWith("SNAPSHOT")) gitCurrentBranch.value
-        else "v" + version.value
-      }
-      Seq(
-        "-groups",
-        "-implicits",
-        "-implicits-show-all",
-        "-sourcepath",
-        new File(baseDirectory.value, "../..").getCanonicalPath,
-        "-doc-source-url",
-        "https://github.com/scodec/scodec-stream/tree/" + tagOrBranch + "€{FILE_PATH}.scala"
-      )
-    },
-    scalacOptions in (Compile, console) ~= {
-      _.filterNot { o =>
-        o == "-Ywarn-unused" || o == "-Xfatal-warnings"
-      }
-    },
-    scalacOptions in (Test, console) := (scalacOptions in (Compile, console)).value
+    unmanagedResources in Compile ++= {
+      val base = baseDirectory.value
+      (base / "NOTICE") +: (base / "LICENSE") +: ((base / "licenses") * "LICENSE_*").get
+    }
   )
-  .jvmSettings(
-    libraryDependencies ++= Seq(
-      "co.fs2" %%% "fs2-io" % "2.4.2" % Test
-    )
+  .jsSettings(
+    crossScalaVersions := (ThisBuild / crossScalaVersions).value.filter(_.startsWith("2."))
   )
+
 lazy val streamJVM = stream.jvm
+  .enablePlugins(SbtOsgi)
+  .settings(
+    libraryDependencies += "co.fs2" %%% "fs2-io" % "2.5.0-M1" % Test,
+    OsgiKeys.privatePackage := Nil,
+    OsgiKeys.exportPackage := Seq("scodec.stream.*;version=${Bundle-Version}"),
+    OsgiKeys.importPackage := Seq(
+      """scala.*;version="$<range;[==,=+);$<@>>"""",
+      """fs2.*;version="$<range;[==,=+);$<@>>"""",
+      """scodec.*;version="$<range;[==,=+);$<@>>"""",
+      "*"
+    ),
+    OsgiKeys.additionalHeaders := Map("-removeheaders" -> "Include-Resource,Private-Package")
+  )
 lazy val streamJS = stream.js
 
 lazy val root = project
   .in(file("."))
   .aggregate(streamJVM, streamJS)
-  .settings(
-    publishArtifact := false,
-    mimaPreviousArtifacts := Set.empty
-  )
+  .settings(noPublishSettings)

@@ -1,3 +1,33 @@
+/*
+ * Copyright (c) 2013, Scodec
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice, this
+ *    list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * 3. Neither the name of the copyright holder nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software without
+ *    specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 package scodec.stream.examples
 
 import scala.concurrent.duration._
@@ -70,8 +100,8 @@ object Mpeg extends App {
       .compile
       .fold(0)((acc, _) => acc + 1)
 
-  val result2 = time("coarse-grained")(countElements(streamThroughRecordsOnly).unsafeRunSync)
-  val result1 = time("fine-grained")(countElements(streamier).unsafeRunSync)
+  val result2 = time("coarse-grained")(countElements(streamThroughRecordsOnly).unsafeRunSync())
+  val result1 = time("fine-grained")(countElements(streamier).unsafeRunSync())
 
   println("fine-grained stream packet count: " + result1)
   println("coarse-grained stream packet count: " + result2)
@@ -120,16 +150,17 @@ object PcapCodec {
       network: Long
   )
 
-  implicit val pcapHeader: Codec[PcapHeader] = {
-    ("magic_number" | byteOrdering) >>:~ { implicit ordering =>
-      ("version_major" | guint16) ::
-        ("version_minor" | guint16) ::
-        ("thiszone" | gint32) ::
-        ("sigfigs" | guint32) ::
-        ("snaplen" | guint32) ::
-        ("network" | guint32)
-    }
-  }.as[PcapHeader]
+  implicit val pcapHeader: Codec[PcapHeader] =
+    ("magic_number" | byteOrdering)
+      .flatPrepend { implicit ordering =>
+        ("version_major" | guint16) ::
+          ("version_minor" | guint16) ::
+          ("thiszone" | gint32) ::
+          ("sigfigs" | guint32) ::
+          ("snaplen" | guint32) ::
+          ("network" | guint32)
+      }
+      .as[PcapHeader]
 
   case class PcapRecordHeader(
       timestampSeconds: Long,
@@ -140,7 +171,7 @@ object PcapCodec {
     def timestamp: Double = timestampSeconds + (timestampMicros / (1.second.toMicros.toDouble))
   }
 
-  implicit def pcapRecordHeader(implicit ordering: ByteOrdering) = {
+  implicit def pcapRecordHeader(implicit ordering: ByteOrdering): Codec[PcapRecordHeader] = {
     ("ts_sec" | guint32) ::
       ("ts_usec" | guint32) ::
       ("incl_len" | guint32) ::
@@ -149,19 +180,21 @@ object PcapCodec {
 
   case class PcapRecord(header: PcapRecordHeader, data: BitVector)
 
-  implicit def pcapRecord(implicit ordering: ByteOrdering) = {
-    ("record_header" | pcapRecordHeader) >>:~ { hdr =>
-      ("record_data" | bits(hdr.includedLength * 8)).hlist
-    }
-  }.as[PcapRecord]
+  implicit def pcapRecord(implicit ordering: ByteOrdering): Codec[PcapRecord] =
+    ("record_header" | pcapRecordHeader)
+      .flatPrepend { hdr =>
+        ("record_data" | bits(hdr.includedLength * 8)).hlist
+      }
+      .as[PcapRecord]
 
   case class PcapFile(header: PcapHeader, records: Vector[PcapRecord])
 
-  implicit val pcapFile = {
-    pcapHeader >>:~ { hdr =>
-      vector(pcapRecord(hdr.ordering)).hlist
-    }
-  }.as[PcapFile]
+  implicit val pcapFile: Codec[PcapFile] =
+    pcapHeader
+      .flatPrepend { hdr =>
+        vector(pcapRecord(hdr.ordering)).hlist
+      }
+      .as[PcapFile]
 }
 
 object MpegCodecs {
@@ -207,14 +240,14 @@ object MpegCodecs {
   )
 
   implicit val transportStreamHeader: Codec[TransportStreamHeader] = {
-    ("syncByte" | constant(0x47)) :~>:
-      ("transportStringIndicator" | bool) ::
-      ("payloadUnitStartIndicator" | bool) ::
-      ("transportPriority" | bool) ::
-      ("pid" | uint(13)) ::
-      ("scramblingControl" | uint2) ::
-      ("adaptationFieldControl" | uint2) ::
-      ("continuityCounter" | uint4)
+    ("syncByte" | constant(0x47)) ~>
+      (("transportStringIndicator" | bool) ::
+        ("payloadUnitStartIndicator" | bool) ::
+        ("transportPriority" | bool) ::
+        ("pid" | uint(13)) ::
+        ("scramblingControl" | uint2) ::
+        ("adaptationFieldControl" | uint2) ::
+        ("continuityCounter" | uint4))
   }.as[TransportStreamHeader]
 
   implicit val adaptationFieldFlags: Codec[AdaptationFieldFlags] = {
@@ -228,18 +261,20 @@ object MpegCodecs {
       ("adaptationFieldExtension" | bool)
   }.as[AdaptationFieldFlags]
 
-  implicit val adaptationField: Codec[AdaptationField] = {
-    ("adaptation_flags" | adaptationFieldFlags) >>:~ { flags =>
-      ("pcr" | conditional(flags.pcrFlag, bits(48))) ::
-        ("opcr" | conditional(flags.opcrFlag, bits(48))) ::
-        ("spliceCountdown" | conditional(flags.splicingPointFlag, int8))
-    }
-  }.as[AdaptationField]
+  implicit val adaptationField: Codec[AdaptationField] =
+    ("adaptation_flags" | adaptationFieldFlags)
+      .flatPrepend { flags =>
+        ("pcr" | conditional(flags.pcrFlag, bits(48))) ::
+          ("opcr" | conditional(flags.opcrFlag, bits(48))) ::
+          ("spliceCountdown" | conditional(flags.splicingPointFlag, int8))
+      }
+      .as[AdaptationField]
 
-  implicit val mpegPacket: Codec[MpegPacket] = {
-    ("header" | transportStreamHeader) >>:~ { hdr =>
-      ("adaptation_field" | conditional(hdr.adaptationFieldIncluded, adaptationField)) ::
-        ("payload" | conditional(hdr.payloadIncluded, bytes(184)))
-    }
-  }.as[MpegPacket]
+  implicit val mpegPacket: Codec[MpegPacket] =
+    ("header" | transportStreamHeader)
+      .flatPrepend { hdr =>
+        ("adaptation_field" | conditional(hdr.adaptationFieldIncluded, adaptationField)) ::
+          ("payload" | conditional(hdr.payloadIncluded, bytes(184)))
+      }
+      .as[MpegPacket]
 }
