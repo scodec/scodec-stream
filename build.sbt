@@ -72,6 +72,7 @@ val stream = crossProject(JVMPlatform, JSPlatform)
   .in(file("."))
   .enablePlugins(BuildInfoPlugin)
   .settings(
+    name := "scodec-stream",
     buildInfoPackage := "scodec.stream",
     buildInfoKeys := Seq[BuildInfoKey](version, scalaVersion, gitHeadCommit),
     libraryDependencies ++= Seq(
