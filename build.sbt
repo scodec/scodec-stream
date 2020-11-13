@@ -13,7 +13,7 @@ ThisBuild / organizationName := "Scodec"
 ThisBuild / homepage := Some(url("https://github.com/scodec/scodec-stream"))
 ThisBuild / startYear := Some(2013)
 
-ThisBuild / crossScalaVersions := Seq("2.12.11", "2.13.3")
+ThisBuild / crossScalaVersions := Seq("2.12.11", "2.13.3", "3.0.0-M1")
 
 ThisBuild / strictSemVer := false
 
@@ -77,7 +77,7 @@ val stream = crossProject(JVMPlatform, JSPlatform)
     buildInfoKeys := Seq[BuildInfoKey](version, scalaVersion, gitHeadCommit),
     libraryDependencies ++= Seq(
       "co.fs2" %%% "fs2-core" % "2.5.0-M1",
-      "org.scodec" %%% "scodec-core" % (if (isDotty.value) "2.0.0-M1" else "1.11.7"),
+      "org.scodec" %%% "scodec-core" % (if (isDotty.value) "2.0-8aea6c7" else "1.11.7"),
       "org.scalacheck" %%% "scalacheck" % "1.15.1" % Test
     ),
     unmanagedResources in Compile ++= {
