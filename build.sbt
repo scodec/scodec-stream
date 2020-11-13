@@ -58,8 +58,9 @@ ThisBuild / publishGithubUser := "mpilquist"
 ThisBuild / publishFullName := "Michael Pilquist"
 ThisBuild / developers ++= List(
   "pchiusano" -> "Paul Chiusano"
-).map { case (username, fullName) =>
-  Developer(username, fullName, s"@$username", url(s"https://github.com/$username"))
+).map {
+  case (username, fullName) =>
+    Developer(username, fullName, s"@$username", url(s"https://github.com/$username"))
 }
 
 ThisBuild / fatalWarningsInCI := false
@@ -82,23 +83,25 @@ val stream = crossProject(JVMPlatform, JSPlatform)
       val base = baseDirectory.value
       (base / "NOTICE") +: (base / "LICENSE") +: ((base / "licenses") * "LICENSE_*").get
     }
-  ).
-  jsSettings(
-   crossScalaVersions := (ThisBuild / crossScalaVersions).value.filter(_.startsWith("2."))
+  )
+  .jsSettings(
+    crossScalaVersions := (ThisBuild / crossScalaVersions).value.filter(_.startsWith("2."))
   )
 
-lazy val streamJVM = stream.jvm.enablePlugins(SbtOsgi).settings(
-  libraryDependencies += "co.fs2" %%% "fs2-io" % "2.5.0-M1" % Test,
-  OsgiKeys.privatePackage := Nil,
-  OsgiKeys.exportPackage := Seq("scodec.stream.*;version=${Bundle-Version}"),
-  OsgiKeys.importPackage := Seq(
-    """scala.*;version="$<range;[==,=+);$<@>>"""",
-    """fs2.*;version="$<range;[==,=+);$<@>>"""",
-    """scodec.*;version="$<range;[==,=+);$<@>>"""",
-    "*"
-  ),
-  OsgiKeys.additionalHeaders := Map("-removeheaders" -> "Include-Resource,Private-Package")
-)
+lazy val streamJVM = stream.jvm
+  .enablePlugins(SbtOsgi)
+  .settings(
+    libraryDependencies += "co.fs2" %%% "fs2-io" % "2.5.0-M1" % Test,
+    OsgiKeys.privatePackage := Nil,
+    OsgiKeys.exportPackage := Seq("scodec.stream.*;version=${Bundle-Version}"),
+    OsgiKeys.importPackage := Seq(
+      """scala.*;version="$<range;[==,=+);$<@>>"""",
+      """fs2.*;version="$<range;[==,=+);$<@>>"""",
+      """scodec.*;version="$<range;[==,=+);$<@>>"""",
+      "*"
+    ),
+    OsgiKeys.additionalHeaders := Map("-removeheaders" -> "Include-Resource,Private-Package")
+  )
 lazy val streamJS = stream.js
 
 lazy val root = project

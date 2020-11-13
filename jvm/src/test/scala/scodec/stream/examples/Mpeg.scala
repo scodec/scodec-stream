@@ -150,16 +150,17 @@ object PcapCodec {
       network: Long
   )
 
-  implicit val pcapHeader: Codec[PcapHeader] = {
-    ("magic_number" | byteOrdering).flatPrepend { implicit ordering =>
-      ("version_major" | guint16) ::
-        ("version_minor" | guint16) ::
-        ("thiszone" | gint32) ::
-        ("sigfigs" | guint32) ::
-        ("snaplen" | guint32) ::
-        ("network" | guint32)
-    }
-  }.as[PcapHeader]
+  implicit val pcapHeader: Codec[PcapHeader] =
+    ("magic_number" | byteOrdering)
+      .flatPrepend { implicit ordering =>
+        ("version_major" | guint16) ::
+          ("version_minor" | guint16) ::
+          ("thiszone" | gint32) ::
+          ("sigfigs" | guint32) ::
+          ("snaplen" | guint32) ::
+          ("network" | guint32)
+      }
+      .as[PcapHeader]
 
   case class PcapRecordHeader(
       timestampSeconds: Long,
@@ -179,19 +180,21 @@ object PcapCodec {
 
   case class PcapRecord(header: PcapRecordHeader, data: BitVector)
 
-  implicit def pcapRecord(implicit ordering: ByteOrdering): Codec[PcapRecord] = {
-    ("record_header" | pcapRecordHeader).flatPrepend { hdr =>
-      ("record_data" | bits(hdr.includedLength * 8)).hlist
-    }
-  }.as[PcapRecord]
+  implicit def pcapRecord(implicit ordering: ByteOrdering): Codec[PcapRecord] =
+    ("record_header" | pcapRecordHeader)
+      .flatPrepend { hdr =>
+        ("record_data" | bits(hdr.includedLength * 8)).hlist
+      }
+      .as[PcapRecord]
 
   case class PcapFile(header: PcapHeader, records: Vector[PcapRecord])
 
-  implicit val pcapFile: Codec[PcapFile] = {
-    pcapHeader.flatPrepend { hdr =>
-      vector(pcapRecord(hdr.ordering)).hlist
-    }
-  }.as[PcapFile]
+  implicit val pcapFile: Codec[PcapFile] =
+    pcapHeader
+      .flatPrepend { hdr =>
+        vector(pcapRecord(hdr.ordering)).hlist
+      }
+      .as[PcapFile]
 }
 
 object MpegCodecs {
@@ -239,12 +242,12 @@ object MpegCodecs {
   implicit val transportStreamHeader: Codec[TransportStreamHeader] = {
     ("syncByte" | constant(0x47)) ~>
       (("transportStringIndicator" | bool) ::
-      ("payloadUnitStartIndicator" | bool) ::
-      ("transportPriority" | bool) ::
-      ("pid" | uint(13)) ::
-      ("scramblingControl" | uint2) ::
-      ("adaptationFieldControl" | uint2) ::
-      ("continuityCounter" | uint4))
+        ("payloadUnitStartIndicator" | bool) ::
+        ("transportPriority" | bool) ::
+        ("pid" | uint(13)) ::
+        ("scramblingControl" | uint2) ::
+        ("adaptationFieldControl" | uint2) ::
+        ("continuityCounter" | uint4))
   }.as[TransportStreamHeader]
 
   implicit val adaptationFieldFlags: Codec[AdaptationFieldFlags] = {
@@ -258,18 +261,20 @@ object MpegCodecs {
       ("adaptationFieldExtension" | bool)
   }.as[AdaptationFieldFlags]
 
-  implicit val adaptationField: Codec[AdaptationField] = {
-    ("adaptation_flags" | adaptationFieldFlags).flatPrepend { flags =>
-      ("pcr" | conditional(flags.pcrFlag, bits(48))) ::
-        ("opcr" | conditional(flags.opcrFlag, bits(48))) ::
-        ("spliceCountdown" | conditional(flags.splicingPointFlag, int8))
-    }
-  }.as[AdaptationField]
+  implicit val adaptationField: Codec[AdaptationField] =
+    ("adaptation_flags" | adaptationFieldFlags)
+      .flatPrepend { flags =>
+        ("pcr" | conditional(flags.pcrFlag, bits(48))) ::
+          ("opcr" | conditional(flags.opcrFlag, bits(48))) ::
+          ("spliceCountdown" | conditional(flags.splicingPointFlag, int8))
+      }
+      .as[AdaptationField]
 
-  implicit val mpegPacket: Codec[MpegPacket] = {
-    ("header" | transportStreamHeader).flatPrepend { hdr =>
-      ("adaptation_field" | conditional(hdr.adaptationFieldIncluded, adaptationField)) ::
-        ("payload" | conditional(hdr.payloadIncluded, bytes(184)))
-    }
-  }.as[MpegPacket]
+  implicit val mpegPacket: Codec[MpegPacket] =
+    ("header" | transportStreamHeader)
+      .flatPrepend { hdr =>
+        ("adaptation_field" | conditional(hdr.adaptationFieldIncluded, adaptationField)) ::
+          ("payload" | conditional(hdr.payloadIncluded, bytes(184)))
+      }
+      .as[MpegPacket]
 }
