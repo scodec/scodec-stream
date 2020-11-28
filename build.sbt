@@ -13,36 +13,20 @@ ThisBuild / organizationName := "Scodec"
 ThisBuild / homepage := Some(url("https://github.com/scodec/scodec-stream"))
 ThisBuild / startYear := Some(2013)
 
-ThisBuild / crossScalaVersions := Seq("2.12.11", "2.13.3", "3.0.0-M1")
+ThisBuild / crossScalaVersions := Seq("2.12.11", "2.13.3", "3.0.0-M1", "3.0.0-M2")
 
 ThisBuild / strictSemVer := false
 
 ThisBuild / versionIntroduced := Map(
-  "3.0.0-M1" -> "2.0.99"
+  "3.0.0-M1" -> "2.0.99",
+  "3.0.0-M2" -> "2.0.99"
 )
 
 ThisBuild / githubWorkflowJavaVersions := Seq("adopt@1.8")
 
-ThisBuild / githubWorkflowPublishTargetBranches := Seq(
-  RefPredicate.Equals(Ref.Branch("main")),
-  RefPredicate.StartsWith(Ref.Tag("v"))
-)
+ThisBuild / spiewakCiReleaseSnapshots := true
 
-ThisBuild / githubWorkflowEnv ++= Map(
-  "SONATYPE_USERNAME" -> s"$${{ secrets.SONATYPE_USERNAME }}",
-  "SONATYPE_PASSWORD" -> s"$${{ secrets.SONATYPE_PASSWORD }}",
-  "PGP_SECRET" -> s"$${{ secrets.PGP_SECRET }}"
-)
-
-ThisBuild / githubWorkflowTargetTags += "v*"
-
-ThisBuild / githubWorkflowPublishPreamble +=
-  WorkflowStep.Run(
-    List("echo $PGP_SECRET | base64 -d | gpg --import"),
-    name = Some("Import signing key")
-  )
-
-ThisBuild / githubWorkflowPublish := Seq(WorkflowStep.Sbt(List("release")))
+ThisBuild / spiewakMainBranches := List("main")
 
 ThisBuild / scmInfo := Some(
   ScmInfo(url("https://github.com/scodec/scodec-stream"), "git@github.com:scodec/scodec-stream.git")
@@ -76,8 +60,8 @@ val stream = crossProject(JVMPlatform, JSPlatform)
     buildInfoPackage := "scodec.stream",
     buildInfoKeys := Seq[BuildInfoKey](version, scalaVersion, gitHeadCommit),
     libraryDependencies ++= Seq(
-      "co.fs2" %%% "fs2-core" % "2.5.0-M1",
-      "org.scodec" %%% "scodec-core" % (if (isDotty.value) "2.0-8aea6c7" else "1.11.7"),
+      "co.fs2" %%% "fs2-core" % "2.5.0-M3",
+      "org.scodec" %%% "scodec-core" % (if (isDotty.value) "2.0.0-M2" else "1.11.7"),
       "org.scalacheck" %%% "scalacheck" % "1.15.1" % Test
     ),
     unmanagedResources in Compile ++= {
@@ -85,14 +69,11 @@ val stream = crossProject(JVMPlatform, JSPlatform)
       (base / "NOTICE") +: (base / "LICENSE") +: ((base / "licenses") * "LICENSE_*").get
     }
   )
-  .jsSettings(
-    crossScalaVersions := (ThisBuild / crossScalaVersions).value.filter(_.startsWith("2."))
-  )
 
 lazy val streamJVM = stream.jvm
   .enablePlugins(SbtOsgi)
   .settings(
-    libraryDependencies += "co.fs2" %%% "fs2-io" % "2.5.0-M1" % Test,
+    libraryDependencies += "co.fs2" %%% "fs2-io" % "2.5.0-M3" % Test,
     OsgiKeys.privatePackage := Nil,
     OsgiKeys.exportPackage := Seq("scodec.stream.*;version=${Bundle-Version}"),
     OsgiKeys.importPackage := Seq(
@@ -108,4 +89,4 @@ lazy val streamJS = stream.js
 lazy val root = project
   .in(file("."))
   .aggregate(streamJVM, streamJS)
-  .settings(noPublishSettings)
+  .enablePlugins(NoPublishPlugin, SonatypeCiRelease)
