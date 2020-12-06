@@ -89,4 +89,4 @@ lazy val streamJS = stream.js
 lazy val root = project
   .in(file("."))
   .aggregate(streamJVM, streamJS)
-  .enablePlugins(NoPublishPlugin, SonatypeCiRelease)
+  .enablePlugins(NoPublishPlugin, SonatypeCiReleasePlugin)
