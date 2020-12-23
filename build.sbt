@@ -25,7 +25,7 @@ ThisBuild / githubWorkflowJavaVersions := Seq("adopt@1.8")
 
 ThisBuild / spiewakCiReleaseSnapshots := true
 
-ThisBuild / spiewakMainBranches := List("main")
+ThisBuild / spiewakMainBranches := List("main", "develop")
 
 ThisBuild / scmInfo := Some(
   ScmInfo(url("https://github.com/scodec/scodec-stream"), "git@github.com:scodec/scodec-stream.git")
