@@ -32,7 +32,8 @@ package scodec.stream.examples
 
 import scala.concurrent.duration._
 
-import cats.effect.{Blocker, ContextShift, IO}
+import cats.effect.IO
+import cats.effect.unsafe.implicits.global
 
 import scodec.bits._
 import scodec._
@@ -82,21 +83,14 @@ object Mpeg extends App {
     result
   }
 
-  implicit val csIO: ContextShift[IO] =
-    IO.contextShift(scala.concurrent.ExecutionContext.Implicits.global)
-
   val filePath = Paths.get("path/to/file")
 
   def countElements(decoder: StreamDecoder[_]): IO[Int] =
-    Stream
-      .resource(Blocker[IO])
-      .flatMap { blocker =>
-        fs2.io.file
-          .readAll[IO](filePath, blocker, 4096)
-          .chunks
-          .map(c => BitVector.view(c.toArray))
-          .through(decoder.toPipe)
-      }
+    fs2.io.file
+      .readAll[IO](filePath, 4096)
+      .chunks
+      .map(c => BitVector.view(c.toArray))
+      .through(decoder.toPipe)
       .compile
       .fold(0)((acc, _) => acc + 1)
 
