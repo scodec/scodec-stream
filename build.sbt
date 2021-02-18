@@ -60,7 +60,7 @@ val stream = crossProject(JVMPlatform, JSPlatform)
     buildInfoKeys := Seq[BuildInfoKey](version, scalaVersion, gitHeadCommit),
     libraryDependencies ++= Seq(
       "co.fs2" %%% "fs2-core" % "2.5.0",
-      "org.scodec" %%% "scodec-core" % (if (isDotty.value) "2.0.0-M3" else "1.11.7"),
+      "org.scodec" %%% "scodec-core" % (if (isDotty.value) "2.0.0-RC1" else "1.11.7"),
       "org.scalacheck" %%% "scalacheck" % "1.15.3" % Test
     ),
     unmanagedResources in Compile ++= {
