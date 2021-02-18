@@ -13,7 +13,7 @@ ThisBuild / organizationName := "Scodec"
 ThisBuild / homepage := Some(url("https://github.com/scodec/scodec-stream"))
 ThisBuild / startYear := Some(2013)
 
-ThisBuild / crossScalaVersions := Seq("2.12.11", "2.13.3", "3.0.0-M3")
+ThisBuild / crossScalaVersions := Seq("2.12.11", "2.13.3", "3.0.0-RC1")
 
 ThisBuild / strictSemVer := false
 
@@ -59,9 +59,9 @@ val stream = crossProject(JVMPlatform, JSPlatform)
     buildInfoPackage := "scodec.stream",
     buildInfoKeys := Seq[BuildInfoKey](version, scalaVersion, gitHeadCommit),
     libraryDependencies ++= Seq(
-      "co.fs2" %%% "fs2-core" % "3.0.0-M7",
-      "org.scodec" %%% "scodec-core" % (if (isDotty.value) "2.0.0-M3" else "1.11.7"),
-      "org.scalacheck" %%% "scalacheck" % "1.15.2" % Test
+      "co.fs2" %%% "fs2-core" % "3.0.0-M9",
+      "org.scodec" %%% "scodec-core" % (if (isDotty.value) "2.0.0-RC1" else "1.11.7"),
+      "org.scalacheck" %%% "scalacheck" % "1.15.3" % Test
     ),
     unmanagedResources in Compile ++= {
       val base = baseDirectory.value
@@ -72,7 +72,7 @@ val stream = crossProject(JVMPlatform, JSPlatform)
 lazy val streamJVM = stream.jvm
   .enablePlugins(SbtOsgi)
   .settings(
-    libraryDependencies += "co.fs2" %%% "fs2-io" % "3.0.0-M7" % Test,
+    libraryDependencies += "co.fs2" %%% "fs2-io" % "3.0.0-M9" % Test,
     OsgiKeys.privatePackage := Nil,
     OsgiKeys.exportPackage := Seq("scodec.stream.*;version=${Bundle-Version}"),
     OsgiKeys.importPackage := Seq(
