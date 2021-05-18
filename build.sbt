@@ -56,8 +56,7 @@ val stream = crossProject(JVMPlatform, JSPlatform)
     buildInfoKeys := Seq[BuildInfoKey](version, scalaVersion, gitHeadCommit),
     libraryDependencies ++= Seq(
       "co.fs2" %%% "fs2-core" % "3.0.3",
-       // TODO: wait for scodec-core 1.11.8 to get the fix from https://github.com/scodec/scodec/pull/252 on pre-dotty scala
-      "org.scodec" %%% "scodec-core" % (if (isDotty.value) "2.0.0" else "1.11.7"),
+      "org.scodec" %%% "scodec-core" % (if (isDotty.value) "2.0.0" else "1.11.8"),
       "org.scalacheck" %%% "scalacheck" % "1.15.4" % Test
     ),
     unmanagedResources in Compile ++= {
