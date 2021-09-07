@@ -62,7 +62,7 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
     val decoder = StreamDecoder.many(bits(4)).flatMap { a =>
       StreamDecoder.tryMany(
         bits(4).flatMap { b =>
-          if (b.toHex == "7") scodec.codecs.fail(Err(""))
+          if (b == bin"0111") scodec.codecs.fail[BitVector](Err(""))
           else scodec.codecs.provide(b)
         }
       )
