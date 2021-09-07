@@ -58,6 +58,20 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
     StreamDecoder.tryMany(int32).decode[Fallible](Stream(bits)).toList == Right(List(1, 2, 3))
   }
 
+  property("many + flatMap + tryMany") = secure {
+    val decoder = StreamDecoder.many(bits(4)).flatMap { a =>
+      StreamDecoder.tryMany(
+        bits(4).flatMap { b =>
+          if (b.toHex == "7") scodec.codecs.fail(Err(""))
+          else scodec.codecs.provide(b)
+        }
+      )
+    }
+    val actual = decoder.decode[Fallible](Stream.emits(
+      hex"1a bc d7 ab 7a bc".toArray.map(BitVector(_)))).compile.fold(BitVector.empty)(_ ++ _)
+    actual == Right(hex"abcdababc".bits.drop(4))
+  }
+
   property("isolate") = forAll { (ints: List[Int], _: Long) =>
     val bits = vector(int32).encode(ints.toVector).require
     val d =
