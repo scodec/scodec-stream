@@ -204,5 +204,4 @@ object StreamEncoder {
 
   /** The encoder that consumes no input and halts with the given error message. */
   def raiseError[A](err: Err): StreamEncoder[A] = raiseError(CodecError(err))
-
 }

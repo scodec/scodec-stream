@@ -106,7 +106,7 @@ final class StreamDecoder[+A] private (private val step: StreamDecoder.Step[A]) 
                   loop(buffer, tl)
                 case Attempt.Failure(e) =>
                   if (failOnErr) Pull.raiseError(CodecError(e))
-                  else Pull.pure(Some(Stream(buffer)))
+                  else Pull.pure(Some(tl.cons1(buffer)))
               }
             case None => if (carry.isEmpty) Pull.pure(None) else Pull.pure(Some(Stream(carry)))
           }
