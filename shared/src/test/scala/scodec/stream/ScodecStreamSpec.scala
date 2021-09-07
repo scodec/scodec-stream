@@ -67,8 +67,10 @@ object ScodecStreamSpec extends Properties("scodec.stream") {
         }
       )
     }
-    val actual = decoder.decode[Fallible](Stream.emits(
-      hex"1a bc d7 ab 7a bc".toArray.map(BitVector(_)))).compile.fold(BitVector.empty)(_ ++ _)
+    val actual = decoder
+      .decode[Fallible](Stream.emits(hex"1a bc d7 ab 7a bc".toArray.map(BitVector(_))))
+      .compile
+      .fold(BitVector.empty)(_ ++ _)
     actual == Right(hex"abcdababc".bits.drop(4))
   }
 
