@@ -55,7 +55,7 @@ val stream = crossProject(JVMPlatform, JSPlatform)
     buildInfoPackage := "scodec.stream",
     buildInfoKeys := Seq[BuildInfoKey](version, scalaVersion, gitHeadCommit),
     libraryDependencies ++= Seq(
-      "co.fs2" %%% "fs2-core" % "2.5.6",
+      "co.fs2" %%% "fs2-core" % "2.5.10",
       "org.scodec" %%% "scodec-core" % (if (isDotty.value) "2.0.0" else "1.11.7"),
       "org.scalacheck" %%% "scalacheck" % "1.15.4" % Test
     ),
@@ -68,7 +68,7 @@ val stream = crossProject(JVMPlatform, JSPlatform)
 lazy val streamJVM = stream.jvm
   .enablePlugins(SbtOsgi)
   .settings(
-    libraryDependencies += "co.fs2" %%% "fs2-io" % "2.5.6" % Test,
+    libraryDependencies += "co.fs2" %%% "fs2-io" % "2.5.10" % Test,
     OsgiKeys.privatePackage := Nil,
     OsgiKeys.exportPackage := Seq("scodec.stream.*;version=${Bundle-Version}"),
     OsgiKeys.importPackage := Seq(
